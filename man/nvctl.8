@@ -1,0 +1,130 @@
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2026 Golem Project Contributors
+.\"
+.Dd November 24, 2026
+.Dt NVCTL 8
+.Os
+.Sh NAME
+.Nm nvctl
+.Nd headless NVIDIA GPU telemetry and power-policy control utility
+.Sh SYNOPSIS
+.Nm
+.Op Fl jqv
+.Op Fl d Ar index
+.Op Ar command Op Ar subcommand Op Ar args ...
+.Sh DESCRIPTION
+The
+.Nm
+utility communicates directly with the NVIDIA Resource Manager (RM) kernel
+interface via
+.Pa /dev/nvidiactl
+to query hardware telemetry and manage power policies on headless
+.Fx
+systems without requiring X11,
+.Xr nvidia-settings 1 ,
+or
+.Xr nvidia-smi 1 .
+.Pp
+When invoked with no
+.Ar command ,
+.Nm
+defaults to
+.Cm status .
+.Pp
+The following global options are supported:
+.Bl -tag -width "-d index"
+.It Fl d Ar index
+Operate only on the specified GPU device
+.Ar index
+(0-based).
+By default, read-only commands iterate over all attached NVIDIA GPUs.
+Mutating commands require
+.Fl d
+when more than one GPU is present.
+.It Fl j
+Emit machine-readable JSON output suitable for
+.Xr node_exporter 8 ,
+dashboards, or external BMC controllers.
+.It Fl q
+Quiet / raw scalar mode for shell scripting (prints bare numeric values
+without units or table headers).
+.It Fl v
+Enable verbose RM ioctl and status-code diagnostics on
+.Va stderr .
+.El
+.Sh COMMANDS
+.Bl -tag -width "power set watts"
+.It Cm status
+Display a summary table of all attached GPUs including index, model name,
+PCI bus/device/function, link speed/width, temperature, fan speed, live
+power draw, and active power cap.
+This is the default command.
+.It Cm list
+Enumerate all attached NVIDIA GPUs and display their RM
+.Va gpuId ,
+PCI BDF, UUID, VBIOS version, and loaded kernel module version.
+.It Cm temp
+Query on-die GPU thermal sensors (core, hotspot, and memory where exposed
+by the hardware and RM branch).
+.It Cm power Op Cm get
+Display live board power draw and configured power policy limits
+(minimum, default, current, and maximum in watts).
+.It Cm power set Ar watts
+Set the runtime GPU power limit to
+.Ar watts
+(integer watts, converted internally to milliwatts).
+Requires appropriate privileges and RM/hardware support; exits with status
+.Li 3
+if gated or unsupported by the loaded driver branch.
+.It Cm fan
+Display fan tachometer speed (RPM) and PWM duty cycle percentage.
+.It Cm probe
+Perform a read-only RM ioctl capability and ABI struct-size probe across
+thermal and PMGR control commands (useful for diagnosing
+.Li 470.xx
+versus
+.Li 5xx.xx
+ABI differences).
+.El
+.Sh FILES
+.Bl -tag -width "/dev/nvidiactl" -compact
+.It Pa /dev/nvidiactl
+NVIDIA Resource Manager control device.
+.It Pa /dev/nvidia Ns Ar N
+Per-GPU NVIDIA device nodes.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width "3" -compact
+.It Li 0
+Command completed successfully.
+.It Li 1
+System call, device open, or RM runtime error.
+.It Li 2
+Invalid command-line syntax or argument value.
+.It Li 3
+Requested operation is unsupported or gated by the RM driver or GPU
+.Pq Dv NV_ERR_NOT_SUPPORTED .
+.El
+.Sh EXAMPLES
+Display a status summary for all GPUs:
+.Pp
+.Dl "nvctl"
+.Pp
+Print raw core temperature of GPU 0 for scripting:
+.Pp
+.Dl "nvctl -q -d 0 temp"
+.Pp
+Dump full telemetry in JSON format:
+.Pp
+.Dl "nvctl -j status"
+.Pp
+Set GPU 0 power limit to 150 watts:
+.Pp
+.Dl "sudo nvctl -d 0 power set 150"
+.Sh SEE ALSO
+.Xr pciconf 8 ,
+.Xr sysctl 8
+.Sh AUTHORS
+.An Golem v1 Community Preservation Lab
