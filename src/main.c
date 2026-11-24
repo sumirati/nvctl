@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,12 +6,21 @@
 
 #include "nvctl.h"
 
+static volatile sig_atomic_t g_stop = 0;
+
+static void
+on_signal(int sig)
+{
+	(void)sig;
+	g_stop = 1;
+}
+
 static void
 usage(void)
 {
 	fprintf(stderr,
 	    "usage: nvctl [-jqv] [-d index] "
-	    "[status | list | temp | power [get | set watts] | probe]\n");
+	    "[status | list | temp | power [get | set watts] | persist | probe]\n");
 }
 
 static int
@@ -222,6 +232,29 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 }
 
 static int
+cmd_persist(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
+{
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = on_signal;
+	(void)sigaction(SIGINT, &sa, NULL);
+	(void)sigaction(SIGTERM, &sa, NULL);
+
+	if (!o->quiet) {
+		printf("nvctl: holding %d GPU(s) initialized (PID %d); "
+		    "send SIGTERM/SIGINT to release\n",
+		    ctx->gpu_count, (int)getpid());
+		fflush(stdout);
+	}
+
+	while (!g_stop)
+		pause();
+
+	return (NVCTL_EXIT_OK);
+}
+
+static int
 cmd_probe(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 {
 	struct nvctl_thermal th;
@@ -309,6 +342,8 @@ main(int argc, char *argv[])
 		rc = cmd_temp(&ctx, &opts);
 	else if (strcmp(verb, "power") == 0)
 		rc = cmd_power(&ctx, &opts, argc, argv);
+	else if (strcmp(verb, "persist") == 0)
+		rc = cmd_persist(&ctx, &opts);
 	else if (strcmp(verb, "probe") == 0)
 		rc = cmd_probe(&ctx, &opts);
 	else {
