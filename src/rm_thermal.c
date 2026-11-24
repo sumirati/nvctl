@@ -63,6 +63,8 @@ nv_thermal_read(struct nvctl_ctx *ctx, int idx, struct nvctl_thermal *out,
 			out->instr_stride = NV2080_THERM_0501_SIZE;
 			out->sensor_count = 1;
 			out->core_temp_c = (int32_t)words[1];
+			out->slowdown_c = (words[13] >> 8) & 0xFFU;
+			out->shutdown_c = (words[13] >> 16) & 0xFFU;
 			return (0);
 		}
 	}
