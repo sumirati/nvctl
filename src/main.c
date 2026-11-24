@@ -26,6 +26,9 @@ usage(void)
 static int
 cmd_list(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 {
+	char devnode[32];
+	uint32_t bus;
+	uint32_t slot;
 	int i;
 	int first;
 
@@ -36,17 +39,26 @@ cmd_list(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 	for (i = 0; i < ctx->gpu_count; i++) {
 		if (o->device_idx >= 0 && o->device_idx != i)
 			continue;
+		if (ctx->gpus[i].dev_unit >= 0)
+			snprintf(devnode, sizeof(devnode), "/dev/nvidia%d",
+			    ctx->gpus[i].dev_unit);
+		else
+			snprintf(devnode, sizeof(devnode), "/dev/nvidia?");
+
+		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
+		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+
 		if (o->json) {
-			printf("%s{\"index\":%d,\"gpu_id\":\"0x%08X\","
-			    "\"device_instance\":%u}",
-			    first ? "" : ",", i, ctx->gpus[i].gpu_id,
-			    ctx->gpus[i].device_instance);
+			printf("%s{\"index\":%d,\"devnode\":\"%s\","
+			    "\"pci\":\"0:%u:%u.0\",\"gpu_id\":\"0x%08X\","
+			    "\"model\":\"%s\"}",
+			    first ? "" : ",", i, devnode, bus, slot,
+			    ctx->gpus[i].gpu_id, ctx->gpus[i].model);
 			first = 0;
 		} else {
-			printf("gpu%d: gpuId=0x%08X dev=%u subdev=%u\n",
-			    i, ctx->gpus[i].gpu_id,
-			    ctx->gpus[i].device_instance,
-			    ctx->gpus[i].subdevice_instance);
+			printf("gpu%d: %-13s pci0:%u:%u:0  gpuId=0x%08X  %s\n",
+			    i, devnode, bus, slot,
+			    ctx->gpus[i].gpu_id, ctx->gpus[i].model);
 		}
 	}
 

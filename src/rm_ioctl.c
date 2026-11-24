@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/sysctl.h>
 #include <unistd.h>
 
 #include "nvctl.h"
@@ -143,7 +144,9 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 	ctx->ctl_fd = -1;
 	for (i = 0; i < NVCTL_MAX_GPUS; i++) {
 		ctx->dev_fds[i] = -1;
+		ctx->dev_units[i] = -1;
 		ctx->gpus[i].dev_fd = -1;
+		ctx->gpus[i].dev_unit = -1;
 	}
 
 	ctx->ctl_fd = open("/dev/nvidiactl", O_RDWR);
@@ -162,9 +165,11 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		snprintf(devpath, sizeof(devpath), "/dev/nvidia%d", i);
 		fd = open(devpath, O_RDWR);
 		if (fd >= 0) {
-			ctx->dev_fds[ctx->dev_fd_count++] = fd;
-			if (verbose)
-				fprintf(stderr, "[v] opened %s\n", devpath);
+			ctx->dev_fds[ctx->dev_fd_count] = fd;
+			ctx->dev_units[ctx->dev_fd_count] = i;
+			ctx->dev_fd_count++;
+			if (verbose >= 2)
+				fprintf(stderr, "[vv] opened %s\n", devpath);
 		}
 	}
 
@@ -204,6 +209,19 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		g->gpu_id = ids.gpu_ids[i];
 		g->device_instance = (uint32_t)ctx->gpu_count;
 		g->subdevice_instance = 0;
+		g->dev_unit = (ctx->gpu_count < ctx->dev_fd_count) ?
+		    ctx->dev_units[ctx->gpu_count] : -1;
+		snprintf(g->model, sizeof(g->model), "unknown");
+		if (g->dev_unit >= 0) {
+			char sname[64];
+			size_t mlen;
+
+			mlen = sizeof(g->model) - 1;
+			snprintf(sname, sizeof(sname),
+			    "hw.nvidia.gpus.%d.model", g->dev_unit);
+			if (sysctlbyname(sname, g->model, &mlen, NULL, 0) == 0)
+				g->model[mlen] = '\0';
+		}
 
 		memset(&info, 0, sizeof(info));
 		info.gpu_id = g->gpu_id;

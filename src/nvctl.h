@@ -44,11 +44,14 @@ struct nvctl_gpu {
 	uint32_t	h_dev;
 	uint32_t	h_sub;
 	int		dev_fd;
+	int		dev_unit;
+	char		model[96];
 };
 
 struct nvctl_ctx {
 	int			ctl_fd;
 	int			dev_fds[NVCTL_MAX_GPUS];
+	int			dev_units[NVCTL_MAX_GPUS];
 	int			dev_fd_count;
 	uint32_t		h_client;
 	int			gpu_count;
