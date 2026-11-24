@@ -24,10 +24,10 @@ to query hardware telemetry, enforce runtime power caps, and hold GPUs
 initialized on headless
 .Fx
 systems without requiring X11,
-.Xr nvidia-settings 1 ,
-.Xr nvidia-smi 1 ,
+.Ql nvidia-settings ,
+.Ql nvidia-smi ,
 or
-.Xr nvidia-persistenced 1 .
+.Ql nvidia-persistenced .
 .Pp
 When invoked with no
 .Ar command ,
@@ -47,7 +47,7 @@ Mutating commands require
 when more than one GPU is present.
 .It Fl j
 Emit machine-readable JSON output suitable for
-.Xr node_exporter 8 ,
+.Ql node_exporter ,
 dashboards, or external BMC controllers.
 .It Fl q
 Quiet / raw scalar mode for shell scripting (prints bare numeric values
