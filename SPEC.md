@@ -1,10 +1,10 @@
 # `nvctl(8)` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
 ## 1. Purpose & Scope
-`nvctl` is a standalone, zero-dependency, BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry and power management on FreeBSD (and Linux) without X11, `nvidia-settings`, or `nvidia-smi`.
+`nvctl` is a standalone, zero-dependency, BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD (and Linux) without X11, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
 
 * **Primary Target:** FreeBSD 14/15 (`x11/nvidia-driver-470` EOL Kepler/Maxwell/Pascal cards, plus newer `nvidia-driver` branches where RM permits).
-* **Distribution:** Standalone repository (`local` GitLab $\rightarrow$ public GitHub) + FreeBSD Port (`sysutils/nvctl`) with `nvctl(8)` man page.
+* **Distribution:** Standalone repository (`local` GitLab $\rightarrow$ public GitHub) + canonical FreeBSD Port (`sysutils/nvctl` in a separate `freebsd/freebsd-ports` fork) with `nvctl(8)` man page.
 
 ---
 
@@ -14,7 +14,7 @@ Follows FreeBSD base tool conventions (`nvmecontrol(8)`, `camcontrol(8)`, `zpool
 
 ### Synopsis
 ```text
-nvctl [-j] [-q] [-v] [-d index] [command [subcommand] [args...]]
+nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 ```
 
 ### Global Flags
@@ -22,57 +22,58 @@ nvctl [-j] [-q] [-v] [-d index] [command [subcommand] [args...]]
 | :---: | :--- |
 | `-d <N>` | Target GPU device index `N` (default: all attached GPUs). |
 | `-j` | Machine-readable JSON output (for `node_exporter`, dashboards, BMC). |
-| `-q` | Quiet / raw scalar output for shell scripting (e.g., `42` instead of `42 C`). |
-| `-v` | Verbose RM status/ioctl diagnostics. |
+| `-q` | Quiet / raw scalar output for shell scripting (e.g., `36` instead of `36 C`). |
+| `-v` | Verbose human-readable diagnostic trace on `stderr`. Stackable (`-vv`) for raw RM ioctl hex word dumps. |
 
 ### Command Verbs
 | Command | Mode | Description |
 | :--- | :---: | :--- |
-| `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, model, PCI BDF, link, temp, fan, power, cap). |
-| `nvctl list` | RO | Enumerate attached GPUs (`gpuId`, PCI BDF, UUID, VBIOS, RM driver version). |
-| `nvctl temp` | RO | Die / hotspot / memory temperatures (`NV2080_CTRL_CMD_THERMAL_*`). |
-| `nvctl power` / `nvctl power get` | RO | Current watt draw + min / default / current / max power policy limits. |
-| `nvctl power set <watts>` | **RW** | Set runtime power cap (explicit `set` verb; requires `-d <N>` when >1 GPU). |
-| `nvctl fan` | RO | Fan tachometer RPM and PWM duty cycle. |
-| `nvctl probe` | RO | Raw RM ioctl capability & ABI struct-size detector (`470.xx` vs `5xx.xx`). |
+| `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, `gpuId`, temp, slowdown/shutdown, min/cur/def/max power cap). |
+| `nvctl list` | RO | Enumerate attached GPUs (`gpuId`, `device_instance`, `subdevice_instance`). |
+| `nvctl temp` | RO | Core temperature + hardware slowdown and emergency shutdown thresholds. |
+| `nvctl power` / `nvctl power get` | RO | Active power cap and hardware min / default / max bounds (watts). |
+| `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N>` when >1 GPU). |
+| `nvctl persist` | RO | Zero-CPU (`pause()`) persistence holder keeping `/dev/nvidiactl` + `/dev/nvidia*` open so runtime power caps survive idle periods (`SIGINT`/`SIGTERM` clean teardown). |
+| `nvctl probe` | RO | Read-only RM ioctl capability & ABI probe (`-vv` dumps non-zero `u32` words). |
 
 ### Exit Codes
 * `0`: Success.
 * `1`: System / ioctl / RM runtime failure.
-* `2`: CLI usage / invalid argument error.
+* `2`: CLI usage / invalid argument / out-of-bounds wattage error.
 * `3`: Feature unsupported or gated by RM/hardware (`NV_ERR_NOT_SUPPORTED` / `0x56`).
 
 ---
 
-## 3. Coding & Architecture Standards
+## 3. Verified `470.256.02` RM Control Map (FreeBSD 15.1 / `GK104`)
 
-1. **FreeBSD `style(9)` Compliance:**
-   * All variable declarations at the top of the function block, sorted by alignment/size.
-   * Zero dead macros, unused structs, or compiler warnings under `-Wall -Wextra -Werror`.
-2. **Deterministic Resource Teardown:**
-   * Every `NV_ESC_RM_ALLOC` (`NV01_ROOT_USER`, `NV01_DEVICE_0`, `NV20_SUBDEVICE_0`) must have a matching `NV_ESC_RM_FREE` cleanup path (`goto cleanup;`) before `close()`.
-3. **True Multi-GPU Enumeration:**
-   * Enumerate all attached GPUs via `NV0000_CTRL_CMD_GPU_GET_ATTACHED_IDS` + `NV0000_CTRL_CMD_GPU_GET_ID_INFO` (never hardcode `deviceId = 0`).
-4. **ABI Version Awareness:**
-   * Query driver version string (`NV_ESC_CHECK_VERSION_STR` / `sysctl hw.nvidia.version`) and select the matching `470.xx` vs. `5xx.xx` RM control struct layouts cleanly.
+| RM Command | Size (B) | Privilege | Function & Verified Offsets |
+| :--- | :---: | :---: | :--- |
+| `0x20800501` | `1036` | User | Thermal settings/reading (`words[0]=0xFFFFFFFF` mask; `words[1]` = core °C; `words[13]>>8` = slowdown °C; `words[13]>>16` = shutdown °C). |
+| `0x2080261C` | `136` | User | Power cap hardware bounds (`[0x0C]` = min mW, `[0x10]` = default mW, `[0x14]` = max mW). |
+| `0x2080261F` | `8` | User | Active power cap get (`[0x04]` = current cap mW). |
+| `0x2080261E` | `12` | **Root** | Active power cap set (`[0x00]=0`, `[0x04]` = target mW, `[0x08]=0`). Persists while any client holds `/dev/nvidia<N>` open. |
+
+*Note on FreeBSD Multi-GPU Device Nodes:* FreeBSD numbers `/dev/nvidia<N>` to match `vgapci<N>` (e.g., `/dev/nvidia2` when two AMD GPUs occupy `vgapci0..1`). `nv_ctx_open()` scans and opens all present `/dev/nvidia0..31` nodes **before** invoking `GPU_ATTACH_IDS`.
 
 ---
 
-## 4. Repository & Canonical Packaging Layout
+## 4. Coding & Repository Standards
 
-`nvctl` is maintained as a standalone upstream source repository (pure software + man page, cutting signed release tags such as `v0.1.0`). Per FreeBSD Ports canon, the FreeBSD Port (`sysutils/nvctl`) does **not** live inside this repository—it is maintained separately on a feature branch of a `freebsd/freebsd-ports` fork referencing the tagged release tarball (`USE_GITHUB=yes`, `GH_TAGNAME=v0.1.0`) to avoid circular `distinfo` hashing.
+1. **FreeBSD `style(9)` Compliance:** Top-of-block variable declarations, explicit `NV_ESC_RM_FREE` teardown on every exit path, zero warnings under `-O2 -Wall -Wextra -Werror -std=c11`.
+2. **Canonical Packaging Separation:** `nvctl` contains only upstream source + man page and cuts signed tags (`v0.1.0`). The FreeBSD Port (`sysutils/nvctl`) lives separately on a branch of a `freebsd/freebsd-ports` fork referencing the tagged release tarball (`USE_GITHUB=yes`) to avoid circular `distinfo` hashing.
 
 ```text
 nvctl/
-├── LICENSE             # BSD-2-Clause
+├── .gitignore
+├── Makefile            # BSD make + GNU make compatible
 ├── README.md           # Overview & quick usage
 ├── SPEC.md             # This specification
-├── Makefile            # BSD make + GNU make compatible
 ├── src/
-│   ├── main.c          # CLI verb dispatcher & output formatters (table/raw/JSON)
-│   ├── rm_ioctl.c      # /dev/nvidiactl transport, client/device lifecycle, NV_ESC_RM_FREE
-│   ├── rm_thermal.c    # 470.xx / 5xx.xx thermal sensor queries
-│   └── rm_pmgr.c       # PMGR power telemetry & power-cap control
+│   ├── nvctl.h         # Shared types, RM constants, prototypes
+│   ├── main.c          # CLI verb dispatcher, formatters (table/raw/JSON), persist
+│   ├── rm_ioctl.c      # /dev/nvidiactl + /dev/nvidia* lifecycle & NV_ESC_RM_FREE
+│   ├── rm_thermal.c    # Thermal sensor & threshold queries (0x20800501)
+│   └── rm_pmgr.c       # PMGR power cap bounds/get/set (0x2080261C/E/F) & probe
 └── man/
     └── nvctl.8         # FreeBSD mdoc(7) manual page
 ```

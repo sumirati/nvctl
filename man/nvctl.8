@@ -3,12 +3,12 @@
 .\"
 .\" Copyright (c) 2026 Golem Project Contributors
 .\"
-.Dd November 24, 2026
+.Dd November 25, 2026
 .Dt NVCTL 8
 .Os
 .Sh NAME
 .Nm nvctl
-.Nd headless NVIDIA GPU telemetry and power-policy control utility
+.Nd headless NVIDIA GPU telemetry, power-cap, and persistence utility
 .Sh SYNOPSIS
 .Nm
 .Op Fl jqv
@@ -20,12 +20,14 @@ The
 utility communicates directly with the NVIDIA Resource Manager (RM) kernel
 interface via
 .Pa /dev/nvidiactl
-to query hardware telemetry and manage power policies on headless
+to query hardware telemetry, enforce runtime power caps, and hold GPUs
+initialized on headless
 .Fx
 systems without requiring X11,
 .Xr nvidia-settings 1 ,
+.Xr nvidia-smi 1 ,
 or
-.Xr nvidia-smi 1 .
+.Xr nvidia-persistenced 1 .
 .Pp
 When invoked with no
 .Ar command ,
@@ -51,49 +53,68 @@ dashboards, or external BMC controllers.
 Quiet / raw scalar mode for shell scripting (prints bare numeric values
 without units or table headers).
 .It Fl v
-Enable verbose RM ioctl and status-code diagnostics on
+Enable human-readable RM diagnostics on
 .Va stderr .
+May be specified twice
+.Pq Fl vv
+for raw RM ioctl hex word dumps.
 .El
 .Sh COMMANDS
 .Bl -tag -width "power set watts"
 .It Cm status
-Display a summary table of all attached GPUs including index, model name,
-PCI bus/device/function, link speed/width, temperature, fan speed, live
-power draw, and active power cap.
+Display a summary table of all attached GPUs including index, RM
+.Va gpuId ,
+core temperature, hardware slowdown/shutdown thresholds, and active power
+cap bounds (min/current/default/max watts).
 This is the default command.
 .It Cm list
 Enumerate all attached NVIDIA GPUs and display their RM
 .Va gpuId ,
-PCI BDF, UUID, VBIOS version, and loaded kernel module version.
+device instance, and subdevice instance.
 .It Cm temp
-Query on-die GPU thermal sensors (core, hotspot, and memory where exposed
-by the hardware and RM branch).
+Query on-die GPU thermal sensor along with hardware slowdown and emergency
+shutdown thresholds.
 .It Cm power Op Cm get
-Display live board power draw and configured power policy limits
-(minimum, default, current, and maximum in watts).
+Display the active power cap and hardware minimum, default, and maximum
+power limits in watts.
 .It Cm power set Ar watts
 Set the runtime GPU power limit to
 .Ar watts
-(integer watts, converted internally to milliwatts).
-Requires appropriate privileges and RM/hardware support; exits with status
-.Li 3
-if gated or unsupported by the loaded driver branch.
-.It Cm fan
-Display fan tachometer speed (RPM) and PWM duty cycle percentage.
+(validated against hardware min/max bounds and converted to milliwatts).
+Requires root privileges.
+Because
+.Fx
+resets GPU state to VBIOS defaults when the last open client closes
+.Pa /dev/nvidia Ns Ar N ,
+run
+.Nm Cm persist
+in the background to keep the power cap sticky across idle periods.
+.It Cm persist
+Hold
+.Pa /dev/nvidiactl
+and all present
+.Pa /dev/nvidia Ns Ar N
+device nodes open while sleeping at zero CPU usage in
+.Xr pause 3
+until
+.Dv SIGINT
+or
+.Dv SIGTERM
+is received, performing clean RM teardown on exit.
 .It Cm probe
-Perform a read-only RM ioctl capability and ABI struct-size probe across
-thermal and PMGR control commands (useful for diagnosing
-.Li 470.xx
-versus
-.Li 5xx.xx
-ABI differences).
+Perform a read-only RM ioctl capability probe across thermal, PMGR, and fan
+control commands (combine with
+.Fl vv
+for raw non-zero word dumps).
 .El
 .Sh FILES
 .Bl -tag -width "/dev/nvidiactl" -compact
 .It Pa /dev/nvidiactl
 NVIDIA Resource Manager control device.
 .It Pa /dev/nvidia Ns Ar N
-Per-GPU NVIDIA device nodes.
+Per-GPU NVIDIA device nodes (numbered to match
+.Xr vgapci 4
+unit indices).
 .El
 .Sh EXIT STATUS
 .Bl -tag -width "3" -compact
@@ -102,7 +123,7 @@ Command completed successfully.
 .It Li 1
 System call, device open, or RM runtime error.
 .It Li 2
-Invalid command-line syntax or argument value.
+Invalid command-line syntax, argument value, or out-of-bounds power cap.
 .It Li 3
 Requested operation is unsupported or gated by the RM driver or GPU
 .Pq Dv NV_ERR_NOT_SUPPORTED .
@@ -116,13 +137,14 @@ Print raw core temperature of GPU 0 for scripting:
 .Pp
 .Dl "nvctl -q -d 0 temp"
 .Pp
+Keep GPU state resident and cap GPU 0 to 150 watts:
+.Pp
+.Dl "nvctl persist &"
+.Dl "sudo nvctl -d 0 power set 150"
+.Pp
 Dump full telemetry in JSON format:
 .Pp
 .Dl "nvctl -j status"
-.Pp
-Set GPU 0 power limit to 150 watts:
-.Pp
-.Dl "sudo nvctl -d 0 power set 150"
 .Sh SEE ALSO
 .Xr pciconf 8 ,
 .Xr sysctl 8
