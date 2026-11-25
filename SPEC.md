@@ -45,6 +45,18 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 * `4`: Driver accepted the write and updated GPU state, but clamped the value away from the requested target.
 * `5`: Requested value rejected against hardware `min..max` safety bounds (no state changed).
 
+### Compatibility Modes (`nvidia-smi` / `nvidia-persistenced`)
+Compatibility personalities must strictly mirror native NVIDIA CLI semantics and units (no invented units, no silent faking of unsupported flags):
+* **Invocation:** Triggered automatically via `basename(argv[0])` (`nvidia-smi` or `nvidia-persistenced` symlink) or explicitly via `nvctl --sm ...` / `nvctl --bd ...` (safe when native binaries are installed).
+* **`nvidia-smi` (`--sm`) Contract:**
+  * **Units:** Always report VRAM in `MiB` (never auto-scale to `GiB`; 6-digit `MiB`-safe up to `999999MiB`), power in `W` (`%.2f W` in CSV), clocks in `MHz`, and temperature in bare `°C` integer (`temperature.gpu`).
+  * **Supported Flags:** No args (90-column aligned summary table with short driver version), `-L`/`--list-gpus` (`GPU <N>: <Model> (UUID: <UUID>)`), `-i <N>`/`--id=<N>`, `-pl <W>`/`--power-limit=<W>` (exact `Power limit for GPU 00000000:BB:DD.0 was set to ...` output + exit codes `0`/`4`/`5`), and `--query-gpu=<fields> --format=csv[,noheader][,nounits]` (`index`, `name`, `uuid`, `pci.bus_id`, `vbios_version`, `driver_version`, `temperature.gpu`, `power.{limit,min_limit,default_limit,max_limit}`, `memory.{total,free,used}`, `pstate`, `clocks.{gr,mem,current.graphics,current.memory}`, `pcie.link.{gen,width}.{current,max}`).
+  * **Fail-Loudly Rule:** Any unsupported flag (e.g. `-pm`, `topo`, `dmon`, `-e`) or unknown `--query-gpu` field MUST print an explicit error to `stderr` and exit `3` (`NVCTL_EXIT_UNSUP`).
+* **`nvidia-persistenced` (`--bd`) Contract:**
+  * Daemonizes cleanly **before** opening `/dev/nvidiactl` (so RM `hClient` belongs to the daemon PID), supports `--no-daemon`, `-V`/`--verbose`, `-p`/`--pid-file <path>`, `-u`/`--user <name>`, and `--[no-]persistence-mode`.
+  * Sleeps at 0% CPU in `pause()` and performs clean RM teardown + PID-file removal on `SIGINT`/`SIGTERM`.
+  * Unknown options fail explicitly with exit `2` (`NVCTL_EXIT_USAGE`).
+
 ---
 
 ## 3. Verified `470.256.02` RM Control Map (FreeBSD 15.1 / `GK104`)
