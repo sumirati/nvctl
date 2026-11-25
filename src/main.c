@@ -254,7 +254,7 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 			    "cap to %u W (default %u W, max %u W)\n",
 			    target, watts, actual_w,
 			    pw.default_mw / 1000U, pw.max_mw / 1000U);
-			return (NVCTL_EXIT_UNSUP);
+			return (NVCTL_EXIT_CLAMPED);
 		}
 		printf("gpu%d: power cap set to %u W\n", target, actual_w);
 		return (NVCTL_EXIT_OK);

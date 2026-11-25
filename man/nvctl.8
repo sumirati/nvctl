@@ -122,7 +122,11 @@ System call, device open, or RM runtime error.
 Invalid command-line syntax, argument value, or out-of-bounds power cap.
 .It Li 3
 Requested operation is unsupported or gated by the RM driver or GPU
-.Pq Dv NV_ERR_NOT_SUPPORTED .
+.Pq Dv NV_ERR_NOT_SUPPORTED ;
+no GPU state was modified.
+.It Li 4
+Driver accepted the write and updated GPU state, but clamped the applied
+value away from the requested target.
 .El
 .Sh EXAMPLES
 Display a status summary for all GPUs:

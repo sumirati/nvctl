@@ -40,7 +40,8 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 * `0`: Success.
 * `1`: System / ioctl / RM runtime failure.
 * `2`: CLI usage / invalid argument / out-of-bounds wattage error.
-* `3`: Feature unsupported or gated by RM/hardware (`NV_ERR_NOT_SUPPORTED` / `0x56`).
+* `3`: Feature unsupported or gated by RM/hardware (`NV_ERR_NOT_SUPPORTED` / `0x56`; no state changed).
+* `4`: Driver accepted the write and updated GPU state, but clamped the value away from the requested target.
 
 ---
 
