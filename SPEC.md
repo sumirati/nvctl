@@ -87,3 +87,39 @@ nvctl/
 └── man/
     └── nvctl.8         # FreeBSD mdoc(7) manual page
 ```
+
+---
+
+## 5. Roadmap (Post-`v0.1.0`)
+
+### 5.1 FreeBSD Port (`sysutils/nvctl`)
+* Create the port skeleton (`Makefile`, `distinfo`, `pkg-descr`) on a dedicated branch of a `freebsd/freebsd-ports` fork pointing at the `v0.1.0` tag (`LICENSE= BEERWARE`, `LICENSE_FILE= ${WRKSRC}/LICENSE`, pinning one canonical host via `USE_GITHUB=yes` or `USE_GITLAB=yes`).
+* Validate with `portlint -AC` and `poudriere testport` across FreeBSD 14.x and 15.x jails, then submit via FreeBSD Bugzilla (`bugs.freebsd.org`).
+* Optional `v0.2.0`: add a FreeBSD `rc.d/nvctl_persist` service script (boot-time persistence + `rc.conf` power-cap target) and fan/live-wattage probes.
+
+### 5.2 FreeBSD Version Matrix & Test Strategy
+* **Target Releases:**
+  * **FreeBSD 14.2 / 14.3-RELEASE** (primary production branch with the largest `nvidia-driver-470` userbase).
+  * **FreeBSD 15.0 / 15.1** (verified live on `x79`).
+  * **FreeBSD `main` (`15`/`16-CURRENT`)** (compile & port check via `poudriere`).
+* **Test Method:**
+  * `poudriere` jails for clean build/packaging verification across all supported FreeBSD releases.
+  * **`bhyve` with PCIe passthrough (`ppt`)** on VT-d hosts (e.g. `x79` i7-4930K) passing through a GPU (`pci0:3:0:0`) into a FreeBSD 14.3-RELEASE guest VM to test live RM ioctls on 14.x without disturbing the host OS.
+
+### 5.3 NVIDIA Driver Branch Compatibility
+* `x11/nvidia-driver-470` (`470.256.02`) — **verified live** (Kepler/Maxwell/Pascal EOL branch; lacks `nvidia-smi`).
+* `x11/nvidia-driver-390` (`390.157`, legacy Fermi/early Kepler) — verify `0x20800501` and `0x2080261C/E/F` struct stability.
+* `x11/nvidia-driver` (current `550`/`570`/`580` production branches & `open-gpu-kernel-modules` on Turing+) — verify whether `0x20800501` and `0x2080261C/E/F` remain compatible or need a `0x20800513` (`THERMAL_SYSTEM_EXECUTE_V2`) fallback.
+
+### 5.4 Hardware Compatibility Matrix (Easy / High-Value Targets)
+* **Kepler (`GK104`):** GeForce GTX 680 — **verified (`v0.1.0`)**.
+* **Low-end / No-Power-Cap Kepler (`GK208` / `GK107`):** GT 710 / GT 730 / Quadro K620 (~€10–25 used) — validates graceful `NVCTL_EXIT_UNSUP` (`3`) handling on cards without software power capping.
+* **Maxwell (`GM107` / `GM200`):** GTX 750 Ti / Quadro M2000 / Tesla M40.
+* **Pascal (`GP100` / `GP104`):** Tesla P100 16GB (`SM 6.0`, `HBM2`, `4096`-bit bus → verifies `HBM2` RAM type + `732 GB/s` bandwidth + 150 W cap) and GTX 1060 / Tesla P4.
+* **Multi-GPU NVIDIA Rig:** 2+ NVIDIA cards simultaneously to verify `-d <N>` enforcement on `power set` and `/dev/nvidia<N>` mapping with `gpu_count > 1`.
+
+### 5.5 Community Announcement Channels
+* **`freebsd-x11@freebsd.org`** — primary FreeBSD graphics/GPU mailing list (read by `nvidia-driver*` and `drm-kmod` maintainers).
+* **`freebsd-ports@freebsd.org`** — once `sysutils/nvctl` is submitted/landed.
+* **`freebsd-hackers@freebsd.org`** — brief `[ANN]` note for systems developers.
+* **FreeBSD Forums** (`forums.freebsd.org` → *Hardware* / *Display Drivers*) and **`r/freebsd`** — primary reach for headless FreeBSD server/homelab users on `nvidia-driver-470`.
