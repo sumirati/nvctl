@@ -56,3 +56,6 @@ nvctl -j status
 ## Documentation
 * **[`SPEC.md`](SPEC.md):** Architecture, CLI verb grammar, verified `470.256.02` RM ioctl map, FreeBSD `style(9)` coding rules, and canonical FreeBSD Ports separation.
 * **[`man/nvctl.8`](man/nvctl.8):** FreeBSD `mdoc(7)` manual page (`mandoc man/nvctl.8 | less`).
+
+---
+*Developed with AI-assisted coding by Gemini 4 Neon; reviewed, tested, and verified on live FreeBSD 15.1 hardware by the author.*
