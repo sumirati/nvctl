@@ -123,8 +123,25 @@ rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
 	p.parms = parms;
 
 	if (ioctl(fd, NV_IOC(NV_ESC_RM_ALLOC, struct nv_os21_params), &p) < 0) {
+		int saved_err = errno;
+		uint8_t probe[64];
+		size_t sz;
+
 		fprintf(stderr, "nvctl: ioctl(NV_ESC_RM_ALLOC, sz=%zu): %s\n",
-		    sizeof(p), strerror(errno));
+		    sizeof(p), strerror(saved_err));
+		if (saved_err == EINVAL) {
+			for (sz = 20; sz <= 56; sz += 4) {
+				memset(probe, 0, sizeof(probe));
+				memcpy(probe, &p, sizeof(p) < sz ? sizeof(p) : sz);
+				if (ioctl(fd, _IOC(IOC_INOUT, NV_IOCTL_MAGIC,
+				    NV_ESC_RM_ALLOC, sz), probe) == 0) {
+					fprintf(stderr,
+					    "[probe] NV_ESC_RM_ALLOC accepted sz=%zu\n",
+					    sz);
+					break;
+				}
+			}
+		}
 		return (0xFFFFFFFFU);
 	}
 	if (out_handle != NULL)
@@ -259,8 +276,14 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		}
 	}
 
-	st = rm_alloc(ctx->ctl_fd, 0, 0, 0, NV01_ROOT_USER, NULL,
-	    &ctx->h_client);
+	{
+		uint32_t root_out = 0;
+
+		st = rm_alloc(ctx->ctl_fd, 0, 0, 0, NV01_ROOT_USER, &root_out,
+		    &ctx->h_client);
+		if (st == NV_OK && ctx->h_client == 0 && root_out != 0)
+			ctx->h_client = root_out;
+	}
 	if (st != NV_OK) {
 		fprintf(stderr, "nvctl: NV01_ROOT_USER alloc failed (0x%X)\n",
 		    st);
