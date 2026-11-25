@@ -101,6 +101,11 @@ struct nvctl_hwinfo {
 	uint32_t	pcie_width;
 	uint32_t	pcie_max_gen;
 	uint32_t	pcie_max_width;
+	int		gr_valid;
+	uint32_t	sm_version;
+	uint32_t	sm_count;
+	uint32_t	cuda_cores;
+	uint32_t	max_warps_per_sm;
 	int		pstate;
 };
 
@@ -118,6 +123,7 @@ int	 nv_power_set(struct nvctl_ctx *ctx, int idx, uint32_t watts,
 void	 nv_hwinfo_read(struct nvctl_ctx *ctx, int idx,
 	    struct nvctl_hwinfo *out);
 const char *nv_ram_type_str(uint32_t ram_type);
+double	 nv_pcie_gbs(uint32_t gen, uint32_t width);
 void	 nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose);
 
 #endif /* NVCTL_H */

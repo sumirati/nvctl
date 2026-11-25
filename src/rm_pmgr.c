@@ -41,6 +41,31 @@ struct rm_info_list_params {
 	uint64_t	list_ptr;
 };
 
+struct rm_gr_info_params {
+	uint32_t	list_size;
+	uint32_t	pad;
+	uint64_t	list_ptr;
+	uint32_t	route_flags;
+	uint32_t	route_pad;
+	uint64_t	route_val;
+};
+
+double
+nv_pcie_gbs(uint32_t gen, uint32_t width)
+{
+	double per_lane;
+
+	switch (gen) {
+	case 1: per_lane = 0.250; break;
+	case 2: per_lane = 0.500; break;
+	case 3: per_lane = 8.0 * 128.0 / 130.0 / 8.0; break;
+	case 4: per_lane = 16.0 * 128.0 / 130.0 / 8.0; break;
+	case 5: per_lane = 32.0 * 128.0 / 130.0 / 8.0; break;
+	default: return (0.0);
+	}
+	return (per_lane * (double)width);
+}
+
 int
 nv_power_read(struct nvctl_ctx *ctx, int idx, struct nvctl_power *out,
     int verbose)
@@ -154,7 +179,9 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 {
 	struct rm_info_item fb_items[4];
 	struct rm_info_item bus_items[2];
+	struct rm_info_item gr_items[4];
 	struct rm_info_list_params lp;
+	struct rm_gr_info_params grp;
 	uint32_t pci_buf[4];
 	uint32_t pmask;
 	uint32_t st;
@@ -211,6 +238,32 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 		out->pcie_max_width = (bus_items[0].data >> 4) & 0x3FU;
 		out->pcie_gen = (bus_items[1].data >> 16) & 0xFU;
 		out->pcie_width = (bus_items[1].data >> 20) & 0x3FU;
+	}
+
+	/* NV2080_CTRL_CMD_GR_GET_INFO (0x20801201): try 32B then 16B */
+	memset(gr_items, 0, sizeof(gr_items));
+	gr_items[0].index = 0x0CU; /* SM_VERSION */
+	gr_items[1].index = 0x09U; /* SHADER_PIPE_SUB_COUNT (SM count) */
+	gr_items[2].index = 0x1DU; /* GPU_CORE_COUNT (CUDA cores) */
+	gr_items[3].index = 0x0DU; /* MAX_WARPS_PER_SM */
+	memset(&grp, 0, sizeof(grp));
+	grp.list_size = 4U;
+	grp.list_ptr = (uint64_t)(uintptr_t)gr_items;
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
+	    &grp, sizeof(grp));
+	if (st == NV_ERR_INVALID_PARAM_STRUCT) {
+		memset(&lp, 0, sizeof(lp));
+		lp.list_size = 4U;
+		lp.list_ptr = (uint64_t)(uintptr_t)gr_items;
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
+		    &lp, sizeof(lp));
+	}
+	if (st == NV_OK) {
+		out->gr_valid = 1;
+		out->sm_version = gr_items[0].data;
+		out->sm_count = gr_items[1].data;
+		out->cuda_cores = gr_items[2].data;
+		out->max_warps_per_sm = gr_items[3].data;
 	}
 
 	/* NV2080_CTRL_CMD_PERF_GET_CURRENT_PSTATE (0x20802068) */

@@ -138,8 +138,12 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    "\"pci_rev\":\"0x%02x\","
 			    "\"model\":\"%s\",\"uuid\":\"%s\",\"vbios\":\"%s\","
 			    "\"bus\":\"%s\",\"irq\":%d,\"driver\":\"%s\","
-			    "\"pcie\":{\"gen\":%u,\"width\":%u,"
-			    "\"max_gen\":%u,\"max_width\":%u},"
+			    "\"pcie\":{\"current_gen\":%u,\"current_width\":%u,"
+			    "\"current_gbs\":%.1f,"
+			    "\"max_gen\":%u,\"max_width\":%u,\"max_gbs\":%.1f},"
+			    "\"compute\":{\"sm_version\":\"%u.%u\","
+			    "\"sm_count\":%u,\"cuda_cores\":%u,"
+			    "\"max_warps_per_sm\":%u},"
 			    "\"memory\":{\"total_mb\":%u,\"free_mb\":%u,"
 			    "\"type\":\"%s\",\"bus_width_bits\":%u},"
 			    "\"pstate\":%d,"
@@ -156,7 +160,12 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    ctx->gpus[i].bus_type, ctx->gpus[i].irq,
 			    ctx->driver_version,
 			    hw.pcie_gen, hw.pcie_width,
+			    nv_pcie_gbs(hw.pcie_gen, hw.pcie_width),
 			    hw.pcie_max_gen, hw.pcie_max_width,
+			    nv_pcie_gbs(hw.pcie_max_gen, hw.pcie_max_width),
+			    (hw.sm_version >> 8) & 0xFFU,
+			    hw.sm_version & 0xFFU,
+			    hw.sm_count, hw.cuda_cores, hw.max_warps_per_sm,
 			    hw.vram_total_mb, hw.vram_free_mb,
 			    nv_ram_type_str(hw.vram_type), hw.vram_bus_width,
 			    hw.pstate,
@@ -183,17 +192,34 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			printf("gpu%d.vbios: %s\n", i, ctx->gpus[i].vbios);
 			printf("gpu%d.bus: %s\n", i, ctx->gpus[i].bus_type);
 			if (hw.pcie_valid) {
-				printf("gpu%d.pcie.gen: %u\n", i, hw.pcie_gen);
-				printf("gpu%d.pcie.width: %u\n", i,
+				printf("gpu%d.pcie.current_gen: %u\n", i,
+				    hw.pcie_gen);
+				printf("gpu%d.pcie.current_width: %u\n", i,
 				    hw.pcie_width);
+				printf("gpu%d.pcie.current_gbs: %.1f\n", i,
+				    nv_pcie_gbs(hw.pcie_gen, hw.pcie_width));
 				printf("gpu%d.pcie.max_gen: %u\n", i,
 				    hw.pcie_max_gen);
 				printf("gpu%d.pcie.max_width: %u\n", i,
 				    hw.pcie_max_width);
+				printf("gpu%d.pcie.max_gbs: %.1f\n", i,
+				    nv_pcie_gbs(hw.pcie_max_gen,
+				    hw.pcie_max_width));
 			}
 			if (ctx->gpus[i].irq >= 0)
 				printf("gpu%d.irq: %d\n", i, ctx->gpus[i].irq);
 			printf("gpu%d.driver: %s\n", i, ctx->driver_version);
+			if (hw.gr_valid) {
+				printf("gpu%d.compute.sm_version: %u.%u\n", i,
+				    (hw.sm_version >> 8) & 0xFFU,
+				    hw.sm_version & 0xFFU);
+				printf("gpu%d.compute.sm_count: %u\n", i,
+				    hw.sm_count);
+				printf("gpu%d.compute.cuda_cores: %u\n", i,
+				    hw.cuda_cores);
+				printf("gpu%d.compute.max_warps_per_sm: %u\n",
+				    i, hw.max_warps_per_sm);
+			}
 			if (hw.fb_valid) {
 				printf("gpu%d.memory.total_mb: %u\n", i,
 				    hw.vram_total_mb);
