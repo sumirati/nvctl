@@ -84,6 +84,26 @@ struct nvctl_power {
 	uint32_t	max_mw;
 };
 
+struct nvctl_hwinfo {
+	int		pci_valid;
+	uint16_t	pci_vendor;
+	uint16_t	pci_device;
+	uint16_t	pci_subvendor;
+	uint16_t	pci_subdevice;
+	uint8_t		pci_rev;
+	int		fb_valid;
+	uint32_t	vram_total_mb;
+	uint32_t	vram_free_mb;
+	uint32_t	vram_bus_width;
+	uint32_t	vram_type;
+	int		pcie_valid;
+	uint32_t	pcie_gen;
+	uint32_t	pcie_width;
+	uint32_t	pcie_max_gen;
+	uint32_t	pcie_max_width;
+	int		pstate;
+};
+
 int	 nv_ctx_open(struct nvctl_ctx *ctx, int verbose);
 void	 nv_ctx_close(struct nvctl_ctx *ctx);
 uint32_t nv_rm_control(struct nvctl_ctx *ctx, uint32_t h_obj, uint32_t cmd,
@@ -95,6 +115,9 @@ int	 nv_power_read(struct nvctl_ctx *ctx, int idx,
 	    struct nvctl_power *out, int verbose);
 int	 nv_power_set(struct nvctl_ctx *ctx, int idx, uint32_t watts,
 	    uint32_t *out_status, int verbose);
+void	 nv_hwinfo_read(struct nvctl_ctx *ctx, int idx,
+	    struct nvctl_hwinfo *out);
+const char *nv_ram_type_str(uint32_t ram_type);
 void	 nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose);
 
 #endif /* NVCTL_H */

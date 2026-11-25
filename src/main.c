@@ -101,6 +101,7 @@ cmd_list(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 static int
 cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 {
+	struct nvctl_hwinfo hw;
 	struct nvctl_thermal th;
 	struct nvctl_power pw;
 	char devnode[32];
@@ -125,23 +126,40 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 
 		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
 		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+		nv_hwinfo_read(ctx, i, &hw);
 		(void)nv_thermal_read(ctx, i, &th, o->verbose);
 		(void)nv_power_read(ctx, i, &pw, o->verbose);
 
 		if (o->json) {
 			printf("%s{\"index\":%d,\"device\":\"%s\","
 			    "\"pci\":\"pci0:%u:%u:0\",\"gpu_id\":\"0x%08X\","
+			    "\"pci_id\":\"%04x:%04x\","
+			    "\"pci_subsys\":\"%04x:%04x\","
+			    "\"pci_rev\":\"0x%02x\","
 			    "\"model\":\"%s\",\"uuid\":\"%s\",\"vbios\":\"%s\","
 			    "\"bus\":\"%s\",\"irq\":%d,\"driver\":\"%s\","
+			    "\"pcie\":{\"gen\":%u,\"width\":%u,"
+			    "\"max_gen\":%u,\"max_width\":%u},"
+			    "\"memory\":{\"total_mb\":%u,\"free_mb\":%u,"
+			    "\"type\":\"%s\",\"bus_width_bits\":%u},"
+			    "\"pstate\":%d,"
 			    "\"temperature\":{\"core_c\":%d,\"slowdown_c\":%u,"
 			    "\"shutdown_c\":%u},"
 			    "\"power\":{\"cap_w\":%u,\"min_w\":%u,"
 			    "\"default_w\":%u,\"max_w\":%u}}",
 			    first ? "" : ",", i, devnode, bus, slot,
-			    ctx->gpus[i].gpu_id, ctx->gpus[i].model,
+			    ctx->gpus[i].gpu_id,
+			    hw.pci_vendor, hw.pci_device,
+			    hw.pci_subvendor, hw.pci_subdevice, hw.pci_rev,
+			    ctx->gpus[i].model,
 			    ctx->gpus[i].uuid, ctx->gpus[i].vbios,
 			    ctx->gpus[i].bus_type, ctx->gpus[i].irq,
 			    ctx->driver_version,
+			    hw.pcie_gen, hw.pcie_width,
+			    hw.pcie_max_gen, hw.pcie_max_width,
+			    hw.vram_total_mb, hw.vram_free_mb,
+			    nv_ram_type_str(hw.vram_type), hw.vram_bus_width,
+			    hw.pstate,
 			    th.valid ? th.core_temp_c : -1,
 			    th.slowdown_c, th.shutdown_c,
 			    pw.current_mw / 1000U, pw.min_mw / 1000U,
@@ -150,15 +168,45 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 		} else {
 			printf("gpu%d.device: %s\n", i, devnode);
 			printf("gpu%d.pci: pci0:%u:%u:0\n", i, bus, slot);
+			if (hw.pci_valid) {
+				printf("gpu%d.pci_id: %04x:%04x\n", i,
+				    hw.pci_vendor, hw.pci_device);
+				printf("gpu%d.pci_subsys: %04x:%04x\n", i,
+				    hw.pci_subvendor, hw.pci_subdevice);
+				printf("gpu%d.pci_rev: 0x%02x\n", i,
+				    hw.pci_rev);
+			}
 			printf("gpu%d.gpu_id: 0x%08X\n", i,
 			    ctx->gpus[i].gpu_id);
 			printf("gpu%d.model: %s\n", i, ctx->gpus[i].model);
 			printf("gpu%d.uuid: %s\n", i, ctx->gpus[i].uuid);
 			printf("gpu%d.vbios: %s\n", i, ctx->gpus[i].vbios);
 			printf("gpu%d.bus: %s\n", i, ctx->gpus[i].bus_type);
+			if (hw.pcie_valid) {
+				printf("gpu%d.pcie.gen: %u\n", i, hw.pcie_gen);
+				printf("gpu%d.pcie.width: %u\n", i,
+				    hw.pcie_width);
+				printf("gpu%d.pcie.max_gen: %u\n", i,
+				    hw.pcie_max_gen);
+				printf("gpu%d.pcie.max_width: %u\n", i,
+				    hw.pcie_max_width);
+			}
 			if (ctx->gpus[i].irq >= 0)
 				printf("gpu%d.irq: %d\n", i, ctx->gpus[i].irq);
 			printf("gpu%d.driver: %s\n", i, ctx->driver_version);
+			if (hw.fb_valid) {
+				printf("gpu%d.memory.total_mb: %u\n", i,
+				    hw.vram_total_mb);
+				printf("gpu%d.memory.free_mb: %u\n", i,
+				    hw.vram_free_mb);
+				printf("gpu%d.memory.type: %s\n", i,
+				    nv_ram_type_str(hw.vram_type));
+				printf("gpu%d.memory.bus_width_bits: %u\n", i,
+				    hw.vram_bus_width);
+			}
+			if (hw.pstate >= 0)
+				printf("gpu%d.perf.pstate: P%d\n", i,
+				    hw.pstate);
 			if (th.valid) {
 				printf("gpu%d.temperature.core_c: %d\n", i,
 				    th.core_temp_c);

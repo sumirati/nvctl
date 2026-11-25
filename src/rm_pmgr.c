@@ -121,6 +121,112 @@ nv_power_set(struct nvctl_ctx *ctx, int idx, uint32_t watts,
 	return (st == NV_OK) ? 0 : -1;
 }
 
+const char *
+nv_ram_type_str(uint32_t ram_type)
+{
+	switch (ram_type) {
+	case 0x01U: return ("SDRAM");
+	case 0x02U: return ("DDR1");
+	case 0x03U: return ("DDR2");
+	case 0x04U: return ("GDDR2");
+	case 0x05U: return ("GDDR3");
+	case 0x06U: return ("GDDR4");
+	case 0x07U: return ("DDR3");
+	case 0x08U: return ("GDDR5");
+	case 0x09U: return ("LPDDR2");
+	case 0x0CU: return ("DDR4");
+	case 0x0DU: return ("LPDDR4");
+	case 0x0EU: return ("HBM1");
+	case 0x0FU: return ("HBM2");
+	case 0x10U: return ("GDDR5X");
+	case 0x11U: return ("GDDR6");
+	case 0x12U: return ("GDDR6X");
+	case 0x13U: return ("LPDDR5");
+	case 0x14U: return ("HBM3");
+	case 0x15U: return ("GDDR7");
+	case 0x16U: return ("HBM4");
+	default:    return ("unknown");
+	}
+}
+
+void
+nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
+{
+	struct rm_info_item fb_items[4];
+	struct rm_info_item bus_items[2];
+	struct rm_info_list_params lp;
+	uint32_t pci_buf[4];
+	uint32_t pmask;
+	uint32_t st;
+	int bit;
+
+	memset(out, 0, sizeof(*out));
+	out->pstate = -1;
+	if (idx < 0 || idx >= ctx->gpu_count)
+		return;
+
+	memset(pci_buf, 0, sizeof(pci_buf));
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801801U,
+	    pci_buf, sizeof(pci_buf));
+	if (st == NV_OK) {
+		out->pci_valid = 1;
+		out->pci_vendor = (uint16_t)(pci_buf[0] & 0xFFFFU);
+		out->pci_device = (uint16_t)((pci_buf[0] >> 16) & 0xFFFFU);
+		out->pci_subvendor = (uint16_t)(pci_buf[1] & 0xFFFFU);
+		out->pci_subdevice = (uint16_t)((pci_buf[1] >> 16) & 0xFFFFU);
+		out->pci_rev = (uint8_t)(pci_buf[2] & 0xFFU);
+	}
+
+	/* NV2080_CTRL_CMD_FB_GET_INFO (0x20801301) */
+	memset(fb_items, 0, sizeof(fb_items));
+	fb_items[0].index = 0x07U; /* RAM_SIZE (KB) */
+	fb_items[1].index = 0x16U; /* HEAP_FREE (KB) */
+	fb_items[2].index = 0x0BU; /* BUS_WIDTH (bits) */
+	fb_items[3].index = 0x0DU; /* RAM_TYPE */
+	memset(&lp, 0, sizeof(lp));
+	lp.list_size = 4U;
+	lp.list_ptr = (uint64_t)(uintptr_t)fb_items;
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801301U,
+	    &lp, sizeof(lp));
+	if (st == NV_OK) {
+		out->fb_valid = 1;
+		out->vram_total_mb = fb_items[0].data / 1024U;
+		out->vram_free_mb = fb_items[1].data / 1024U;
+		out->vram_bus_width = fb_items[2].data;
+		out->vram_type = fb_items[3].data;
+	}
+
+	/* NV2080_CTRL_CMD_BUS_GET_INFO (0x20801802) */
+	memset(bus_items, 0, sizeof(bus_items));
+	bus_items[0].index = 0x03U; /* PCIE_GPU_LINK_CAPS */
+	bus_items[1].index = 0x07U; /* PCIE_GPU_LINK_CTRL_STATUS */
+	memset(&lp, 0, sizeof(lp));
+	lp.list_size = 2U;
+	lp.list_ptr = (uint64_t)(uintptr_t)bus_items;
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801802U,
+	    &lp, sizeof(lp));
+	if (st == NV_OK && bus_items[0].data != 0) {
+		out->pcie_valid = 1;
+		out->pcie_max_gen = bus_items[0].data & 0xFU;
+		out->pcie_max_width = (bus_items[0].data >> 4) & 0x3FU;
+		out->pcie_gen = (bus_items[1].data >> 16) & 0xFU;
+		out->pcie_width = (bus_items[1].data >> 20) & 0x3FU;
+	}
+
+	/* NV2080_CTRL_CMD_PERF_GET_CURRENT_PSTATE (0x20802068) */
+	pmask = 0;
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20802068U,
+	    &pmask, sizeof(pmask));
+	if (st == NV_OK && pmask != 0) {
+		for (bit = 0; bit < 16; bit++) {
+			if ((pmask & (1U << bit)) != 0) {
+				out->pstate = bit;
+				break;
+			}
+		}
+	}
+}
+
 void
 nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 {
@@ -161,11 +267,11 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 		}
 	}
 
-	/* Probe FB_GET_INFO (0x20801301): ram_size(0), ram_type(2), bus_width(5) */
+	/* Probe FB_GET_INFO (0x20801301): ram_size(7), bus_width(11), ram_type(13) */
 	memset(fb_items, 0, sizeof(fb_items));
-	fb_items[0].index = 0U;
-	fb_items[1].index = 2U;
-	fb_items[2].index = 5U;
+	fb_items[0].index = 0x07U;
+	fb_items[1].index = 0x0DU;
+	fb_items[2].index = 0x0BU;
 	memset(&lp, 0, sizeof(lp));
 	lp.list_size = 3U;
 	lp.list_ptr = (uint64_t)(uintptr_t)fb_items;
@@ -175,14 +281,15 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 	    "fb_get_info", 0x20801301U, sizeof(lp), st,
 	    (st == NV_OK) ? " (OK)" : "");
 	if (verbose >= 2 && st == NV_OK)
-		printf("    items: ram_kb=%u ram_type=%u bus_width=%u\n",
-		    fb_items[0].data, fb_items[1].data, fb_items[2].data);
+		printf("    items: ram_kb=%u ram_type=%u(%s) bus_width=%u\n",
+		    fb_items[0].data, fb_items[1].data,
+		    nv_ram_type_str(fb_items[1].data), fb_items[2].data);
 
-	/* Probe BUS_GET_INFO (0x20801802): link_caps(5), link_ctrl(6), gen_info(30) */
+	/* Probe BUS_GET_INFO (0x20801802): link_caps(3), link_ctrl(7), gen_info(0x2D) */
 	memset(bus_items, 0, sizeof(bus_items));
-	bus_items[0].index = 5U;
-	bus_items[1].index = 6U;
-	bus_items[2].index = 30U;
+	bus_items[0].index = 0x03U;
+	bus_items[1].index = 0x07U;
+	bus_items[2].index = 0x2DU;
 	memset(&lp, 0, sizeof(lp));
 	lp.list_size = 3U;
 	lp.list_ptr = (uint64_t)(uintptr_t)bus_items;
