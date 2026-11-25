@@ -26,18 +26,35 @@ nvctl persist &                   # Zero-CPU persistence holder (keeps power cap
 sudo nvctl -d 0 power set 150     # Set runtime power cap to 150W (bounds-checked)
 nvctl -v status                   # Human-readable RM diagnostic trace
 nvctl -vv probe                   # Raw RM ioctl struct-size & hex word dump
+nvctl --sm                        # Emulated nvidia-smi summary (or symlink as nvidia-smi)
+nvctl --bd --pid-file /tmp/nv.pid # Emulated nvidia-persistenced daemon (or symlink)
 ```
 
 ## Examples
 
 ### Apply and Persist a Runtime Power Cap
-Because FreeBSD's `nvidia.ko` resets GPU state to VBIOS defaults when the last open client closes `/dev/nvidia<N>`, start `nvctl persist` before setting a cap so it remains active across idle periods:
+Because FreeBSD's `nvidia.ko` resets GPU state to VBIOS defaults when the last open client closes `/dev/nvidia<N>`, start `nvctl persist` (or `nvctl --bd`) before setting a cap so it remains active across idle periods:
 ```sh
 nvctl list                        # Verify GPU index and /dev/nvidia<N> mapping
 nvctl power                       # Check current cap and hardware min/default/max bounds
 nvctl persist &                   # Hold /dev/nvidia* open at 0% CPU
 sudo nvctl -d 0 power set 150     # Cap GPU 0 to 150 W (exit 0 = exact, 4 = clamped, 5 = out of bounds)
 nvctl power                       # Confirm the 150 W cap stays put
+```
+
+### Boot-Time Persistence & Power Caps (`rc.d/nvctl_persist`)
+Copy `rc.d/nvctl_persist` into `/usr/local/etc/rc.d/nvctl_persist` (`chmod 555`) and enable in `/etc/rc.conf`:
+```sh
+nvctl_persist_enable="YES"
+nvctl_persist_power_caps="0:150"  # Or "all:150" for homogeneous multi-GPU rigs
+```
+
+### `nvidia-smi` & `nvidia-persistenced` Compatibility Mode
+Invoke directly via `--sm` / `--bd` (safe alongside a real `nvidia-smi`), or via symlink:
+```sh
+nvctl --sm -L
+nvctl --sm --query-gpu=index,name,temperature.gpu,power.limit,memory.used,memory.total --format=csv,noheader,nounits
+nvctl --bd --pid-file /var/run/nvctl_persist.pid
 ```
 
 ### Headless Thermal Guard & Telemetry Scripting

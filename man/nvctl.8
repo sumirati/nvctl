@@ -14,6 +14,12 @@
 .Op Fl jqv
 .Op Fl d Ar index
 .Op Ar command Op Ar subcommand Op Ar args ...
+.Nm
+.Fl -sm
+.Op Ar nvidia-smi options ...
+.Nm
+.Fl -bd
+.Op Ar nvidia-persistenced options ...
 .Sh DESCRIPTION
 The
 .Nm
@@ -108,6 +114,40 @@ Perform a read-only RM ioctl capability probe across thermal, PMGR, and fan
 control commands (combine with
 .Fl vv
 for raw non-zero word dumps).
+.El
+.Sh COMPATIBILITY MODES
+.Nm
+can emulate common subsets of
+.Ql nvidia-smi
+and
+.Ql nvidia-persistenced
+either when invoked through a symlink with those names or explicitly via
+.Fl -sm
+and
+.Fl -bd
+(avoiding collisions when native binaries are installed):
+.Bl -tag -width "--bd"
+.It Fl -sm
+Emulate
+.Ql nvidia-smi
+supporting summary table output,
+.Fl L ,
+.Fl i Ar index ,
+.Fl pl Ar watts ,
+and
+.Fl -query-gpu= Ns Ar fields
+.Fl -format=csv Ns Op ,noheader Ns Op ,nounits .
+Unsupported flags fail explicitly with exit status 3.
+.It Fl -bd
+Emulate
+.Ql nvidia-persistenced ,
+daemonizing cleanly before opening RM devices.
+Supports
+.Fl -no-daemon ,
+.Fl -verbose ,
+.Fl -pid-file Ar path ,
+and
+.Fl -user Ar name .
 .El
 .Sh FILES
 .Bl -tag -width "/dev/nvidiactl" -compact

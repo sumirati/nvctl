@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: Beerware
+#
+# PROVIDE: nvctl_persist
+# REQUIRE: kld
+# BEFORE: LOGIN
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable nvctl_persist:
+#
+# nvctl_persist_enable="YES"
+# nvctl_persist_power_caps="0:150"   # Optional: "idx:watts" pairs or "all:150"
+# nvctl_persist_user=""              # Optional: --user privilege drop
+# nvctl_persist_flags=""             # Optional: extra flags for nvctl --bd
+# nvctl_persist_bin="/usr/local/sbin/nvctl"
+
+. /etc/rc.subr
+
+name="nvctl_persist"
+rcvar="nvctl_persist_enable"
+
+load_rc_config $name
+
+: ${nvctl_persist_enable:="NO"}
+: ${nvctl_persist_bin:="/usr/local/sbin/nvctl"}
+: ${nvctl_persist_power_caps:=""}
+: ${nvctl_persist_user:=""}
+: ${nvctl_persist_flags:=""}
+
+pidfile="/var/run/${name}.pid"
+command="${nvctl_persist_bin}"
+command_args="--bd --pid-file ${pidfile}"
+if [ -n "${nvctl_persist_user}" ]; then
+	command_args="${command_args} --user ${nvctl_persist_user}"
+fi
+if [ -n "${nvctl_persist_flags}" ]; then
+	command_args="${command_args} ${nvctl_persist_flags}"
+fi
+
+start_postcmd="${name}_poststart"
+
+nvctl_persist_poststart()
+{
+	local _tries _pair _idx _watts _g
+
+	if [ -z "${nvctl_persist_power_caps}" ]; then
+		return 0
+	fi
+
+	_tries=0
+	while [ ! -s "${pidfile}" ] && [ "${_tries}" -lt 20 ]; do
+		sleep 0.1
+		_tries=$((_tries + 1))
+	done
+
+	for _pair in ${nvctl_persist_power_caps}; do
+		_idx="${_pair%%:*}"
+		_watts="${_pair#*:}"
+		if [ "${_idx}" = "all" ]; then
+			for _g in $("${command}" list | sed -n 's/^gpu\([0-9][0-9]*\):.*/\1/p'); do
+				"${command}" -d "${_g}" power set "${_watts}" || \
+				    warn "nvctl_persist: failed to cap gpu${_g} to ${_watts} W"
+			done
+		else
+			"${command}" -d "${_idx}" power set "${_watts}" || \
+			    warn "nvctl_persist: failed to cap gpu${_idx} to ${_watts} W"
+		fi
+	done
+}
+
+run_rc_command "$1"

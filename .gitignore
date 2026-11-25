@@ -1,3 +1,5 @@
 nvctl
+nvidia-smi
+nvidia-persistenced
 *.o
 .DS_Store

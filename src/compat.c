@@ -76,11 +76,38 @@ bd_usage(void)
 	    "[--pid-file path] [--user name]\n");
 }
 
+static void
+smi_driver_short(const char *full, char *out, size_t sz)
+{
+	const char *p;
+	const char *start;
+	size_t n;
+
+	for (p = full; *p != '\0'; ) {
+		while (*p == ' ' || *p == '\t')
+			p++;
+		start = p;
+		while (*p != '\0' && *p != ' ' && *p != '\t')
+			p++;
+		if (start[0] >= '0' && start[0] <= '9' &&
+		    memchr(start, '.', (size_t)(p - start)) != NULL) {
+			n = (size_t)(p - start);
+			if (n >= sz)
+				n = sz - 1;
+			memcpy(out, start, n);
+			out[n] = '\0';
+			return;
+		}
+	}
+	snprintf(out, sz, "%s", full);
+}
+
 static int
 smi_print_field(struct nvctl_ctx *ctx, int idx, const struct nvctl_hwinfo *hw,
     const struct nvctl_thermal *th, const struct nvctl_power *pw,
     const char *field, int nounits)
 {
+	char drv[32];
 	uint32_t bus;
 	uint32_t slot;
 	uint32_t used_mb;
@@ -101,7 +128,8 @@ smi_print_field(struct nvctl_ctx *ctx, int idx, const struct nvctl_hwinfo *hw,
 	} else if (strcmp(field, "vbios_version") == 0) {
 		printf("%s", ctx->gpus[idx].vbios);
 	} else if (strcmp(field, "driver_version") == 0) {
-		printf("%s", ctx->driver_version);
+		smi_driver_short(ctx->driver_version, drv, sizeof(drv));
+		printf("%s", drv);
 	} else if (strcmp(field, "temperature.gpu") == 0) {
 		printf("%d", th->valid ? th->core_temp_c : -1);
 	} else if (strcmp(field, "power.limit") == 0) {
@@ -243,14 +271,16 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 	struct nvctl_hwinfo hw;
 	struct nvctl_thermal th;
 	struct nvctl_power pw;
+	char drv[32];
 	uint32_t bus;
 	uint32_t slot;
 	uint32_t used_mb;
 	int i;
 
+	smi_driver_short(ctx->driver_version, drv, sizeof(drv));
 	printf("+-----------------------------------------------------------------------------+\n");
-	printf("| nvctl (nvidia-smi compat)   Driver: %-39.39s |\n",
-	    ctx->driver_version);
+	printf("| nvctl (nvidia-smi compat)          Driver Version: %-24.24s |\n",
+	    drv);
 	printf("|----+--------------------------+------------------+--------------------------|\n");
 	printf("| GPU| Name                     | Bus-Id           | Temp  Perf  Cap   Memory |\n");
 	printf("|====+==========================+==================+==========================|\n");

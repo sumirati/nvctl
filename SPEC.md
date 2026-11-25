@@ -83,7 +83,10 @@ nvctl/
 │   ├── main.c          # CLI verb dispatcher, formatters (table/raw/JSON), persist
 │   ├── rm_ioctl.c      # /dev/nvidiactl + /dev/nvidia* lifecycle & NV_ESC_RM_FREE
 │   ├── rm_thermal.c    # Thermal sensor & threshold queries (0x20800501)
-│   └── rm_pmgr.c       # PMGR power cap bounds/get/set (0x2080261C/E/F) & probe
+│   ├── rm_pmgr.c       # PMGR power cap bounds/get/set, FB/BUS/GR/CLK info & probe
+│   └── compat.c        # nvidia-smi (--sm) & nvidia-persistenced (--bd) personalities
+├── rc.d/
+│   └── nvctl_persist   # FreeBSD rc.subr(8) boot-time persistence & power-cap service
 └── man/
     └── nvctl.8         # FreeBSD mdoc(7) manual page
 ```
