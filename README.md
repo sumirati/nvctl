@@ -1,6 +1,6 @@
 # `nvctl` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
-`nvctl` is a BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
+`nvctl` is a Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
 
 ## Verified Hardware
 * **Host:** Gigabyte GA-X79-UP4 Rev 1.1 + Intel Core i7-4930K, FreeBSD 15.1 (`nvidia-driver-470` `470.256.02`)
