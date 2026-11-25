@@ -57,15 +57,8 @@ nvctl_persist_poststart()
 	for _pair in ${nvctl_persist_power_caps}; do
 		_idx="${_pair%%:*}"
 		_watts="${_pair#*:}"
-		if [ "${_idx}" = "all" ]; then
-			for _g in $("${command}" list | sed -n 's/^gpu\([0-9][0-9]*\):.*/\1/p'); do
-				"${command}" -d "${_g}" power set "${_watts}" || \
-				    warn "nvctl_persist: failed to cap gpu${_g} to ${_watts} W"
-			done
-		else
-			"${command}" -d "${_idx}" power set "${_watts}" || \
-			    warn "nvctl_persist: failed to cap gpu${_idx} to ${_watts} W"
-		fi
+		"${command}" -d "${_idx}" power set "${_watts}" || \
+		    warn "nvctl_persist: failed to cap gpu ${_idx} to ${_watts} W"
 	done
 }
 

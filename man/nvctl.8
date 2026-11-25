@@ -37,10 +37,12 @@ defaults to
 .Pp
 The following global options are supported:
 .Bl -tag -width "-d index"
-.It Fl d Ar index
+.It Fl d Ar index | Cm all
 Operate only on the specified GPU device
 .Ar index
-(0-based).
+(0-based), or
+.Cm all
+attached GPUs.
 By default, read-only commands iterate over all attached NVIDIA GPUs.
 Mutating commands require
 .Fl d

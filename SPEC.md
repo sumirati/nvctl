@@ -20,7 +20,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 ### Global Flags
 | Flag | Description |
 | :---: | :--- |
-| `-d <N>` | Target GPU device index `N` (default: all attached GPUs). |
+| `-d <N\|all>` | Target GPU device index `N` or `all` attached GPUs (default: all on RO; required on RW when >1 GPU). |
 | `-j` | Machine-readable JSON output (for `node_exporter`, dashboards, BMC). |
 | `-q` | Quiet / raw scalar output for shell scripting (e.g., `36` instead of `36 C`). |
 | `-v` | Verbose human-readable diagnostic trace on `stderr`. Stackable (`-vv`) for raw RM ioctl hex word dumps. |

@@ -8,6 +8,8 @@
 
 #include "nvctl.h"
 
+#define NVCTL_DEV_ALL  (-2)
+
 static volatile sig_atomic_t g_stop = 0;
 
 static void
@@ -417,12 +419,60 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 			    argv[2]);
 			return (NVCTL_EXIT_USAGE);
 		}
-		target = (o->device_idx >= 0) ? o->device_idx : 0;
-		if (ctx->gpu_count > 1 && o->device_idx < 0) {
+		if (ctx->gpu_count > 1 && o->device_idx == -1) {
 			fprintf(stderr,
-			    "nvctl: -d <index> required with multiple GPUs\n");
+			    "nvctl: -d <index|all> required with multiple GPUs\n");
 			return (NVCTL_EXIT_USAGE);
 		}
+		if (o->device_idx == NVCTL_DEV_ALL) {
+			rc = NVCTL_EXIT_OK;
+			for (i = 0; i < ctx->gpu_count; i++) {
+				int r = nv_power_set(ctx, i, watts, &st,
+				    o->verbose);
+				if (r == -2) {
+					rc = NVCTL_EXIT_RANGE;
+					continue;
+				}
+				if (r != 0) {
+					if (st == NV_ERR_INSUFFICIENT_PERM)
+						fprintf(stderr,
+						    "nvctl: permission denied "
+						    "(run with sudo)\n");
+					else
+						fprintf(stderr,
+						    "nvctl: gpu%d power set "
+						    "failed (status=0x%X)\n",
+						    i, st);
+					rc = (st == NV_ERR_NOT_SUPPORTED) ?
+					    NVCTL_EXIT_UNSUP : NVCTL_EXIT_ERR;
+					continue;
+				}
+				if (nv_power_read(ctx, i, &pw, 0) != 0) {
+					fprintf(stderr,
+					    "nvctl: gpu%d power cap readback "
+					    "failed\n", i);
+					rc = NVCTL_EXIT_ERR;
+					continue;
+				}
+				actual_w = pw.current_mw / 1000U;
+				if (actual_w != watts) {
+					fprintf(stderr,
+					    "nvctl: gpu%d requested %u W, but "
+					    "driver clamped cap to %u W "
+					    "(default %u W, max %u W)\n",
+					    i, watts, actual_w,
+					    pw.default_mw / 1000U,
+					    pw.max_mw / 1000U);
+					if (rc == NVCTL_EXIT_OK)
+						rc = NVCTL_EXIT_CLAMPED;
+					continue;
+				}
+				printf("gpu%d: power cap set to %u W\n",
+				    i, actual_w);
+			}
+			return (rc);
+		}
+		target = (o->device_idx >= 0) ? o->device_idx : 0;
 		rc = nv_power_set(ctx, target, watts, &st, o->verbose);
 		if (rc == -2)
 			return (NVCTL_EXIT_RANGE);
@@ -578,6 +628,10 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "d:jqvh")) != -1) {
 		switch (ch) {
 		case 'd':
+			if (strcmp(optarg, "all") == 0) {
+				opts.device_idx = NVCTL_DEV_ALL;
+				break;
+			}
 			if (parse_u32(optarg, &dev_u32) != 0 ||
 			    dev_u32 >= NVCTL_MAX_GPUS) {
 				fprintf(stderr,
