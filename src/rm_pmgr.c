@@ -376,17 +376,21 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 		printf("    items: link_caps=0x%X link_ctrl=0x%X gen_info=0x%X\n",
 		    bus_items[0].data, bus_items[1].data, bus_items[2].data);
 
-	/* Probe CLK_GET_INFO (0x20801002): MCLK(0x10), GPC2CLK(0x10000), GPCCLK(0x1) */
+	/* Probe CLK_GET_INFO (0x20801002) using only domains from 0x20801001 */
 	{
-		struct rm_clk_info_item clk_items[3];
+		struct rm_clk_info_item clk_items[2];
 		struct rm_clk_get_info_params cp;
+		uint32_t dom[2];
 
+		memset(dom, 0, sizeof(dom));
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801001U,
+		    dom, sizeof(dom));
 		memset(clk_items, 0, sizeof(clk_items));
 		clk_items[0].clk_domain = 0x00000010U; /* MCLK */
-		clk_items[1].clk_domain = 0x00010000U; /* GPC2CLK */
-		clk_items[2].clk_domain = 0x00000001U; /* GPCCLK */
+		clk_items[1].clk_domain = (dom[0] & 0x00010000U) ?
+		    0x00010000U : 0x00000001U; /* GPC2CLK or GPCCLK */
 		memset(&cp, 0, sizeof(cp));
-		cp.list_size = 3U;
+		cp.list_size = 2U;
 		cp.list_ptr = (uint64_t)(uintptr_t)clk_items;
 		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801002U,
 		    &cp, sizeof(cp));
@@ -394,9 +398,10 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 		    "clk_get_info", 0x20801002U, sizeof(cp), st,
 		    (st == NV_OK) ? " (OK)" : "");
 		if (verbose >= 2 && st == NV_OK)
-			printf("    clks(kHz): mclk=%u gpc2clk=%u gpcclk=%u\n",
-			    clk_items[0].actual_freq,
-			    clk_items[1].actual_freq,
-			    clk_items[2].actual_freq);
+			printf("    clks(kHz): mclk(act=%u tgt=%u) "
+			    "gpc(dom=0x%X act=%u tgt=%u)\n",
+			    clk_items[0].actual_freq, clk_items[0].target_freq,
+			    clk_items[1].clk_domain,
+			    clk_items[1].actual_freq, clk_items[1].target_freq);
 	}
 }
