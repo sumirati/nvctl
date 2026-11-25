@@ -230,7 +230,7 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 		}
 		rc = nv_power_set(ctx, target, watts, &st, o->verbose);
 		if (rc == -2)
-			return (NVCTL_EXIT_USAGE);
+			return (NVCTL_EXIT_RANGE);
 		if (rc != 0) {
 			if (st == NV_ERR_INSUFFICIENT_PERM)
 				fprintf(stderr,

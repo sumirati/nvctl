@@ -11,6 +11,7 @@
 #define NVCTL_EXIT_USAGE     2
 #define NVCTL_EXIT_UNSUP     3
 #define NVCTL_EXIT_CLAMPED   4
+#define NVCTL_EXIT_RANGE     5
 
 #define NV_IOCTL_MAGIC       'F'
 #define NV_ESC_RM_FREE       0x29

@@ -119,7 +119,7 @@ Command completed successfully.
 .It Li 1
 System call, device open, or RM runtime error.
 .It Li 2
-Invalid command-line syntax, argument value, or out-of-bounds power cap.
+Invalid command-line syntax, argument value, or device index.
 .It Li 3
 Requested operation is unsupported or gated by the RM driver or GPU
 .Pq Dv NV_ERR_NOT_SUPPORTED ;
@@ -127,6 +127,9 @@ no GPU state was modified.
 .It Li 4
 Driver accepted the write and updated GPU state, but clamped the applied
 value away from the requested target.
+.It Li 5
+Requested value falls outside hardware minimum/maximum safety bounds;
+no GPU state was modified.
 .El
 .Sh EXAMPLES
 Display a status summary for all GPUs:

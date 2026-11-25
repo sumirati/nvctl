@@ -39,9 +39,10 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 ### Exit Codes
 * `0`: Success.
 * `1`: System / ioctl / RM runtime failure.
-* `2`: CLI usage / invalid argument / out-of-bounds wattage error.
+* `2`: CLI usage error, invalid argument, or invalid device index.
 * `3`: Feature unsupported or gated by RM/hardware (`NV_ERR_NOT_SUPPORTED` / `0x56`; no state changed).
 * `4`: Driver accepted the write and updated GPU state, but clamped the value away from the requested target.
+* `5`: Requested value rejected against hardware `min..max` safety bounds (no state changed).
 
 ---
 
