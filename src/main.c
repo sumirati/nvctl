@@ -51,7 +51,9 @@ usage(void)
 	fprintf(stderr,
 	    "usage: nvctl [-jqv] [-d index] "
 	    "[status | list | info | temp | power [get | set watts] | "
-	    "persist | probe]\n");
+	    "persist | probe]\n"
+	    "       nvctl --sm [nvidia-smi options]\n"
+	    "       nvctl --bd [nvidia-persistenced options]\n");
 }
 
 static int
@@ -547,10 +549,22 @@ main(int argc, char *argv[])
 {
 	struct nvctl_opts opts;
 	struct nvctl_ctx ctx;
+	const char *prog;
 	const char *verb;
 	uint32_t dev_u32;
 	int ch;
 	int rc;
+
+	prog = strrchr(argv[0], '/');
+	prog = (prog != NULL) ? prog + 1 : argv[0];
+	if (strcmp(prog, "nvidia-smi") == 0)
+		return (nv_compat_smi(argc, argv));
+	if (strcmp(prog, "nvidia-persistenced") == 0)
+		return (nv_compat_persistenced(argc, argv));
+	if (argc >= 2 && strcmp(argv[1], "--sm") == 0)
+		return (nv_compat_smi(argc - 1, argv + 1));
+	if (argc >= 2 && strcmp(argv[1], "--bd") == 0)
+		return (nv_compat_persistenced(argc - 1, argv + 1));
 
 	opts.device_idx = -1;
 	opts.json = 0;

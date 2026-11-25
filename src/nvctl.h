@@ -134,4 +134,7 @@ double	 nv_mem_gbs(uint32_t mem_clk_khz, uint32_t bus_width_bits,
 	    uint32_t ram_type);
 void	 nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose);
 
+int	 nv_compat_smi(int argc, char *argv[]);
+int	 nv_compat_persistenced(int argc, char *argv[]);
+
 #endif /* NVCTL_H */
