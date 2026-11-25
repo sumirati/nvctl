@@ -9,6 +9,13 @@
 #include "nvctl.h"
 
 #define NV_IOC(cmd, type) _IOWR(NV_IOCTL_MAGIC, (cmd), type)
+#define NV_ESC_CHECK_VERSION_STR  0xD2
+
+struct nv_ioctl_rm_api_version {
+	uint32_t	cmd;
+	uint32_t	reply;
+	char		version_string[64];
+};
 
 struct nv_os00_params {
 	uint32_t	h_root;
@@ -115,8 +122,11 @@ rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
 	p.h_class = cls;
 	p.parms = parms;
 
-	if (ioctl(fd, NV_IOC(NV_ESC_RM_ALLOC, struct nv_os21_params), &p) < 0)
+	if (ioctl(fd, NV_IOC(NV_ESC_RM_ALLOC, struct nv_os21_params), &p) < 0) {
+		fprintf(stderr, "nvctl: ioctl(NV_ESC_RM_ALLOC, sz=%zu): %s\n",
+		    sizeof(p), strerror(errno));
 		return (0xFFFFFFFFU);
+	}
 	if (out_handle != NULL)
 		*out_handle = p.h_new;
 	return (p.status);
@@ -186,6 +196,38 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		fprintf(stderr, "nvctl: open(/dev/nvidiactl): %s\n",
 		    strerror(errno));
 		return (-1);
+	}
+
+	/*
+	 * Legacy branches (e.g. 390.xx) require NV_ESC_CHECK_VERSION_STR
+	 * handshake on /dev/nvidiactl before accepting NV_ESC_RM_ALLOC.
+	 */
+	{
+		struct nv_ioctl_rm_api_version ver;
+
+		memset(&ver, 0, sizeof(ver));
+		ver.cmd = '2'; /* NV_RM_API_VERSION_CMD_QUERY */
+		if (ioctl(ctx->ctl_fd,
+		    NV_IOC(NV_ESC_CHECK_VERSION_STR,
+		    struct nv_ioctl_rm_api_version), &ver) == 0) {
+			if (verbose)
+				fprintf(stderr,
+				    "[v] CHECK_VERSION_STR query='%s' reply=%u\n",
+				    ver.version_string, ver.reply);
+			ver.cmd = 0; /* NV_RM_API_VERSION_CMD_STRICT */
+			ver.reply = 0;
+			(void)ioctl(ctx->ctl_fd,
+			    NV_IOC(NV_ESC_CHECK_VERSION_STR,
+			    struct nv_ioctl_rm_api_version), &ver);
+			if (verbose)
+				fprintf(stderr,
+				    "[v] CHECK_VERSION_STR strict reply=%u\n",
+				    ver.reply);
+		} else if (verbose) {
+			fprintf(stderr,
+			    "[v] CHECK_VERSION_STR ioctl failed: %s\n",
+			    strerror(errno));
+		}
 	}
 
 	/*
