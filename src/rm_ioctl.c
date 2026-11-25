@@ -123,25 +123,8 @@ rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
 	p.parms = parms;
 
 	if (ioctl(fd, NV_IOC(NV_ESC_RM_ALLOC, struct nv_os21_params), &p) < 0) {
-		int saved_err = errno;
-		uint8_t probe[64];
-		size_t sz;
-
-		fprintf(stderr, "nvctl: ioctl(NV_ESC_RM_ALLOC, sz=%zu): %s\n",
-		    sizeof(p), strerror(saved_err));
-		if (saved_err == EINVAL) {
-			for (sz = 20; sz <= 56; sz += 4) {
-				memset(probe, 0, sizeof(probe));
-				memcpy(probe, &p, sizeof(p) < sz ? sizeof(p) : sz);
-				if (ioctl(fd, _IOC(IOC_INOUT, NV_IOCTL_MAGIC,
-				    NV_ESC_RM_ALLOC, sz), probe) == 0) {
-					fprintf(stderr,
-					    "[probe] NV_ESC_RM_ALLOC accepted sz=%zu\n",
-					    sz);
-					break;
-				}
-			}
-		}
+		fprintf(stderr, "nvctl: ioctl(NV_ESC_RM_ALLOC, cls=0x%X): %s\n",
+		    cls, strerror(errno));
 		return (0xFFFFFFFFU);
 	}
 	if (out_handle != NULL)
@@ -371,6 +354,23 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		devp.device_id = g->device_instance;
 		st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
 		    g->h_dev, NV01_DEVICE_0, &devp, NULL);
+		if (st != NV_OK) {
+			/* 390.xx fallback 1: explicit h_client_share */
+			devp.h_client_share = ctx->h_client;
+			st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
+			    g->h_dev, NV01_DEVICE_0, &devp, NULL);
+		}
+		if (st != NV_OK) {
+			/* 390.xx fallback 2: NULL parms (default device 0) */
+			st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
+			    g->h_dev, NV01_DEVICE_0, NULL, NULL);
+		}
+		if (st != NV_OK && ctx->dev_fd_count > 0) {
+			/* 390.xx fallback 3: alloc on /dev/nvidia<N> fd */
+			st = rm_alloc(ctx->dev_fds[0], ctx->h_client,
+			    ctx->h_client, g->h_dev, NV01_DEVICE_0,
+			    &devp, NULL);
+		}
 		if (st != NV_OK) {
 			if (verbose)
 				fprintf(stderr,
