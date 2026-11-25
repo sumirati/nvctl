@@ -95,7 +95,9 @@ nvctl/
 ### 5.1 FreeBSD Port (`sysutils/nvctl`)
 * Create the port skeleton (`Makefile`, `distinfo`, `pkg-descr`) on a dedicated branch of a `freebsd/freebsd-ports` fork pointing at the `v0.1.0` tag (`LICENSE= BEERWARE`, `LICENSE_FILE= ${WRKSRC}/LICENSE`, pinning one canonical host via `USE_GITHUB=yes` or `USE_GITLAB=yes`).
 * Validate with `portlint -AC` and `poudriere testport` across FreeBSD 14.x and 15.x jails, then submit via FreeBSD Bugzilla (`bugs.freebsd.org`).
-* Optional `v0.2.0`: add a FreeBSD `rc.d/nvctl_persist` service script (boot-time persistence + `rc.conf` power-cap target), fan/live-wattage probes, and **`argv[0]` chameleon mode (`nvidia-smi` compatibility)**: if invoked via symlink as `nvidia-smi`, translate common flags (`-L`, `-i <N>`, `-pl <W>`, `-pm 1`, `--query-gpu=... --format=csv,noheader,nounits`) so existing Linux/monitoring scripts work drop-in on FreeBSD.
+* Optional `v0.2.0`: add a FreeBSD `rc.d/nvctl_persist` service script (boot-time persistence + `rc.conf` power-cap target), fan/live-wattage probes, and **`argv[0]` chameleon modes (opt-in Port symlinks, default off)**:
+  * `nvidia-smi`: translate common flags (`-L`, `-i <N>`, `-pl <W>`, `-pm 1`, `--query-gpu=... --format=csv,noheader,nounits`) and fail loudly (`NVCTL_EXIT_UNSUP`) on unimplemented flags.
+  * `nvidia-persistenced`: thin shim over `nvctl persist` supporting `--verbose`, daemonize/`--no-daemon`, and PID file handling.
 
 ### 5.2 FreeBSD Version Matrix & Test Strategy
 * **Target Releases:**
