@@ -51,7 +51,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: nvctl [-jqv] [-d index] "
+	    "usage: nvctl [-jqv] [-d index|all] "
 	    "[status | list | info | temp | power [get | set watts] | "
 	    "persist | probe]\n"
 	    "       nvctl --sm [nvidia-smi options]\n"

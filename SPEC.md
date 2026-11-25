@@ -116,9 +116,9 @@ nvctl/
 
 ### 5.2 FreeBSD Version Matrix & Test Strategy
 * **Target Releases:**
-  * **FreeBSD 14.2 / 14.3-RELEASE** (primary production branch with the largest `nvidia-driver-470` userbase).
-  * **FreeBSD 15.0 / 15.1** (verified live on `x79`).
-  * **FreeBSD `main` (`15`/`16-CURRENT`)** (compile & port check via `poudriere`).
+  * **FreeBSD 14.5-RELEASE** — **verified live** via `bhyve` + `ppt` PCIe passthrough (`390.157` and `470.256.02`).
+  * **FreeBSD 15.1** — **verified live** bare-metal (`390.157` and `470.256.02`).
+  * **FreeBSD `main` (`15`/`16-CURRENT`)** — compile & port check via `poudriere`.
 * **Test Method:**
   * `poudriere` jails for clean build/packaging verification across all supported FreeBSD releases.
   * **`bhyve` with PCIe passthrough (`ppt`)** on VT-d hosts (e.g. `x79` i7-4930K) passing through a GPU (`pci0:3:0:0`) into a FreeBSD 14.3-RELEASE guest VM to test live RM ioctls on 14.x without disturbing the host OS.
