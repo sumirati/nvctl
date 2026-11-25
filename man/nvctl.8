@@ -136,14 +136,25 @@ Display a status summary for all GPUs:
 .Pp
 .Dl "nvctl"
 .Pp
-Print raw core temperature of GPU 0 for scripting:
+Inspect hardware limits, start the zero-CPU persistence holder, cap GPU 0
+to 150 watts, and verify that the cap remains active:
 .Pp
-.Dl "nvctl -q -d 0 temp"
+.Bd -literal -offset indent
+nvctl list
+nvctl power
+nvctl persist &
+sudo nvctl -d 0 power set 150
+nvctl power
+.Ed
 .Pp
-Keep GPU state resident and cap GPU 0 to 150 watts:
+Poll bare core temperature of GPU 0 in a shell thermal guard:
 .Pp
-.Dl "nvctl persist &"
-.Dl "sudo nvctl -d 0 power set 150"
+.Bd -literal -offset indent
+temp=$(nvctl -q -d 0 temp)
+if [ "$temp" -ge 85 ]; then
+    logger -p kern.crit "GPU 0 temperature ${temp} C exceeded threshold"
+fi
+.Ed
 .Pp
 Dump full telemetry in JSON format:
 .Pp

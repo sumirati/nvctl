@@ -27,6 +27,31 @@ nvctl -v status                   # Human-readable RM diagnostic trace
 nvctl -vv probe                   # Raw RM ioctl struct-size & hex word dump
 ```
 
+## Examples
+
+### Apply and Persist a Runtime Power Cap
+Because FreeBSD's `nvidia.ko` resets GPU state to VBIOS defaults when the last open client closes `/dev/nvidia<N>`, start `nvctl persist` before setting a cap so it remains active across idle periods:
+```sh
+nvctl list                        # Verify GPU index and /dev/nvidia<N> mapping
+nvctl power                       # Check current cap and hardware min/default/max bounds
+nvctl persist &                   # Hold /dev/nvidia* open at 0% CPU
+sudo nvctl -d 0 power set 150     # Cap GPU 0 to 150 W (exit 0 = exact, 4 = clamped, 5 = out of bounds)
+nvctl power                       # Confirm the 150 W cap stays put
+```
+
+### Headless Thermal Guard & Telemetry Scripting
+Use `-q` for bare scalar output in shell watchdogs, or `-j` for structured JSON ingestion:
+```sh
+# Shell thermal guard (nvctl -q prints a bare Celsius integer, e.g. 36)
+temp=$(nvctl -q -d 0 temp)
+if [ "$temp" -ge 85 ]; then
+    logger -p kern.crit "GPU 0 temperature ${temp} C exceeded threshold"
+fi
+
+# Structured JSON snapshot for dashboards or collectors
+nvctl -j status
+```
+
 ## Documentation
 * **[`SPEC.md`](SPEC.md):** Architecture, CLI verb grammar, verified `470.256.02` RM ioctl map, FreeBSD `style(9)` coding rules, and canonical FreeBSD Ports separation.
 * **[`man/nvctl.8`](man/nvctl.8):** FreeBSD `mdoc(7)` manual page (`mandoc man/nvctl.8 | less`).
