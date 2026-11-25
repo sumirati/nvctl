@@ -272,19 +272,18 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 	struct nvctl_thermal th;
 	struct nvctl_power pw;
 	char drv[32];
-	char membuf[20];
 	uint32_t bus;
 	uint32_t slot;
 	uint32_t used_mb;
 	int i;
 
 	smi_driver_short(ctx->driver_version, drv, sizeof(drv));
-	printf("+-----------------------------------------------------------------------------+\n");
-	printf("| nvctl (nvidia-smi compat)          Driver Version: %-24.24s |\n",
+	printf("+----------------------------------------------------------------------------------------+\n");
+	printf("| nvctl (nvidia-smi compat)                   Driver Version: %-26.26s |\n",
 	    drv);
-	printf("|----+------------------------+------------------+----------------------------|\n");
-	printf("| GPU| Name                   | Bus-Id           | Temp Perf Cap       Memory |\n");
-	printf("|====+========================+==================+============================|\n");
+	printf("|----+------------------------+------------------+---------------+-----------------------|\n");
+	printf("| GPU| Name                   | Bus-Id           | Temp Perf Cap |          Memory-Usage |\n");
+	printf("|====+========================+==================+===============+=======================|\n");
 
 	for (i = 0; i < ctx->gpu_count; i++) {
 		if (dev_idx >= 0 && dev_idx != i)
@@ -296,21 +295,15 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
 		used_mb = (hw.vram_total_mb >= hw.vram_free_mb) ?
 		    (hw.vram_total_mb - hw.vram_free_mb) : 0U;
-		if (hw.vram_total_mb >= 100000U)
-			snprintf(membuf, sizeof(membuf), "%5u/%5uG",
-			    used_mb / 1024U, hw.vram_total_mb / 1024U);
-		else
-			snprintf(membuf, sizeof(membuf), "%5u/%5uM",
-			    used_mb, hw.vram_total_mb);
 
 		printf("| %2d | %-22.22s | 00000000:%02X:%02X.0 | "
-		    "%3dC P%-2d %3uW %12.12s |\n",
+		    "%3dC P%-2d %3uW | %6uMiB / %6uMiB |\n",
 		    i, ctx->gpus[i].model, bus, slot,
 		    th.valid ? th.core_temp_c : -1,
 		    (hw.pstate >= 0) ? hw.pstate : 0,
-		    pw.current_mw / 1000U, membuf);
+		    pw.current_mw / 1000U, used_mb, hw.vram_total_mb);
 	}
-	printf("+-----------------------------------------------------------------------------+\n");
+	printf("+----------------------------------------------------------------------------------------+\n");
 }
 
 int
