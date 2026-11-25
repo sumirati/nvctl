@@ -67,6 +67,12 @@ Enumerate all attached NVIDIA GPUs and display their device node
 PCI bus/device/function address, RM
 .Va gpuId ,
 and model name.
+.It Cm info
+Display detailed per-GPU identity, driver metadata, thermal thresholds,
+and power-cap limits in flat
+.Xr sysctl 8 Ns -style
+key/value lines (or JSON with
+.Fl j ) .
 .It Cm temp
 Query on-die GPU thermal sensor along with hardware slowdown and emergency
 shutdown thresholds.

@@ -17,6 +17,7 @@ Compiles cleanly with `cc -O2 -Wall -Wextra -Werror -std=c11`.
 ```sh
 nvctl                             # Multi-GPU summary table (alias: nvctl status)
 nvctl list                        # Enumerate attached GPUs (/dev/nvidia<N>, PCI BDF, gpuId, model)
+nvctl info                        # Detailed sysctl-style per-GPU identity & telemetry dump
 nvctl temp                        # GPU core temperature + slowdown/shutdown thresholds
 nvctl -q -d 0 temp                # Bare numeric temperature for shell scripts
 nvctl -j status                   # JSON output for node_exporter / dashboards

@@ -50,7 +50,8 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: nvctl [-jqv] [-d index] "
-	    "[status | list | temp | power [get | set watts] | persist | probe]\n");
+	    "[status | list | info | temp | power [get | set watts] | "
+	    "persist | probe]\n");
 }
 
 static int
@@ -89,6 +90,93 @@ cmd_list(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			printf("gpu%d: %-13s pci0:%u:%u:0  gpuId=0x%08X  %s\n",
 			    i, devnode, bus, slot,
 			    ctx->gpus[i].gpu_id, ctx->gpus[i].model);
+		}
+	}
+
+	if (o->json)
+		printf("]\n");
+	return (NVCTL_EXIT_OK);
+}
+
+static int
+cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
+{
+	struct nvctl_thermal th;
+	struct nvctl_power pw;
+	char devnode[32];
+	uint32_t bus;
+	uint32_t slot;
+	int i;
+	int first;
+
+	first = 1;
+	if (o->json)
+		printf("[");
+
+	for (i = 0; i < ctx->gpu_count; i++) {
+		if (o->device_idx >= 0 && o->device_idx != i)
+			continue;
+
+		if (ctx->gpus[i].dev_unit >= 0)
+			snprintf(devnode, sizeof(devnode), "/dev/nvidia%d",
+			    ctx->gpus[i].dev_unit);
+		else
+			snprintf(devnode, sizeof(devnode), "/dev/nvidia?");
+
+		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
+		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+		(void)nv_thermal_read(ctx, i, &th, o->verbose);
+		(void)nv_power_read(ctx, i, &pw, o->verbose);
+
+		if (o->json) {
+			printf("%s{\"index\":%d,\"device\":\"%s\","
+			    "\"pci\":\"pci0:%u:%u:0\",\"gpu_id\":\"0x%08X\","
+			    "\"model\":\"%s\",\"uuid\":\"%s\",\"vbios\":\"%s\","
+			    "\"bus\":\"%s\",\"irq\":%d,\"driver\":\"%s\","
+			    "\"temperature\":{\"core_c\":%d,\"slowdown_c\":%u,"
+			    "\"shutdown_c\":%u},"
+			    "\"power\":{\"cap_w\":%u,\"min_w\":%u,"
+			    "\"default_w\":%u,\"max_w\":%u}}",
+			    first ? "" : ",", i, devnode, bus, slot,
+			    ctx->gpus[i].gpu_id, ctx->gpus[i].model,
+			    ctx->gpus[i].uuid, ctx->gpus[i].vbios,
+			    ctx->gpus[i].bus_type, ctx->gpus[i].irq,
+			    ctx->driver_version,
+			    th.valid ? th.core_temp_c : -1,
+			    th.slowdown_c, th.shutdown_c,
+			    pw.current_mw / 1000U, pw.min_mw / 1000U,
+			    pw.default_mw / 1000U, pw.max_mw / 1000U);
+			first = 0;
+		} else {
+			printf("gpu%d.device: %s\n", i, devnode);
+			printf("gpu%d.pci: pci0:%u:%u:0\n", i, bus, slot);
+			printf("gpu%d.gpu_id: 0x%08X\n", i,
+			    ctx->gpus[i].gpu_id);
+			printf("gpu%d.model: %s\n", i, ctx->gpus[i].model);
+			printf("gpu%d.uuid: %s\n", i, ctx->gpus[i].uuid);
+			printf("gpu%d.vbios: %s\n", i, ctx->gpus[i].vbios);
+			printf("gpu%d.bus: %s\n", i, ctx->gpus[i].bus_type);
+			if (ctx->gpus[i].irq >= 0)
+				printf("gpu%d.irq: %d\n", i, ctx->gpus[i].irq);
+			printf("gpu%d.driver: %s\n", i, ctx->driver_version);
+			if (th.valid) {
+				printf("gpu%d.temperature.core_c: %d\n", i,
+				    th.core_temp_c);
+				printf("gpu%d.temperature.slowdown_c: %u\n", i,
+				    th.slowdown_c);
+				printf("gpu%d.temperature.shutdown_c: %u\n", i,
+				    th.shutdown_c);
+			}
+			if (pw.valid) {
+				printf("gpu%d.power.cap_w: %u\n", i,
+				    pw.current_mw / 1000U);
+				printf("gpu%d.power.min_w: %u\n", i,
+				    pw.min_mw / 1000U);
+				printf("gpu%d.power.default_w: %u\n", i,
+				    pw.default_mw / 1000U);
+				printf("gpu%d.power.max_w: %u\n", i,
+				    pw.max_mw / 1000U);
+			}
 		}
 	}
 
@@ -401,8 +489,9 @@ main(int argc, char *argv[])
 	verb = (argc > 0) ? argv[0] : "status";
 
 	if (strcmp(verb, "status") != 0 && strcmp(verb, "list") != 0 &&
-	    strcmp(verb, "temp") != 0 && strcmp(verb, "power") != 0 &&
-	    strcmp(verb, "persist") != 0 && strcmp(verb, "probe") != 0) {
+	    strcmp(verb, "info") != 0 && strcmp(verb, "temp") != 0 &&
+	    strcmp(verb, "power") != 0 && strcmp(verb, "persist") != 0 &&
+	    strcmp(verb, "probe") != 0) {
 		fprintf(stderr, "nvctl: unknown command '%s'\n", verb);
 		usage();
 		return (NVCTL_EXIT_USAGE);
@@ -433,6 +522,8 @@ main(int argc, char *argv[])
 		rc = cmd_status(&ctx, &opts);
 	else if (strcmp(verb, "list") == 0)
 		rc = cmd_list(&ctx, &opts);
+	else if (strcmp(verb, "info") == 0)
+		rc = cmd_info(&ctx, &opts);
 	else if (strcmp(verb, "temp") == 0)
 		rc = cmd_temp(&ctx, &opts);
 	else if (strcmp(verb, "power") == 0)

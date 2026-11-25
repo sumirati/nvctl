@@ -73,6 +73,35 @@ struct nv0000_gpu_id_info_params {
 	int32_t		numa_id;
 };
 
+static void
+sysctl_read_str(const char *name, char *buf, size_t sz, const char *fallback)
+{
+	size_t len;
+
+	len = sz - 1;
+	if (sysctlbyname(name, buf, &len, NULL, 0) == 0 && len > 0) {
+		buf[len] = '\0';
+		while (len > 0 && (buf[len - 1] == '\0' ||
+		    buf[len - 1] == '\n' || buf[len - 1] == ' '))
+			buf[--len] = '\0';
+		if (len > 0)
+			return;
+	}
+	snprintf(buf, sz, "%s", fallback);
+}
+
+static int
+sysctl_read_int(const char *name, int fallback)
+{
+	int val;
+	size_t len;
+
+	len = sizeof(val);
+	if (sysctlbyname(name, &val, &len, NULL, 0) == 0 && len == sizeof(val))
+		return (val);
+	return (fallback);
+}
+
 static uint32_t
 rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
     uint32_t cls, void *parms, uint32_t *out_handle)
@@ -142,11 +171,14 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->ctl_fd = -1;
+	sysctl_read_str("hw.nvidia.version", ctx->driver_version,
+	    sizeof(ctx->driver_version), "unknown");
 	for (i = 0; i < NVCTL_MAX_GPUS; i++) {
 		ctx->dev_fds[i] = -1;
 		ctx->dev_units[i] = -1;
 		ctx->gpus[i].dev_fd = -1;
 		ctx->gpus[i].dev_unit = -1;
+		ctx->gpus[i].irq = -1;
 	}
 
 	ctx->ctl_fd = open("/dev/nvidiactl", O_RDWR);
@@ -211,16 +243,34 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		g->subdevice_instance = 0;
 		g->dev_unit = (ctx->gpu_count < ctx->dev_fd_count) ?
 		    ctx->dev_units[ctx->gpu_count] : -1;
-		snprintf(g->model, sizeof(g->model), "unknown");
 		if (g->dev_unit >= 0) {
 			char sname[64];
-			size_t mlen;
 
-			mlen = sizeof(g->model) - 1;
 			snprintf(sname, sizeof(sname),
 			    "hw.nvidia.gpus.%d.model", g->dev_unit);
-			if (sysctlbyname(sname, g->model, &mlen, NULL, 0) == 0)
-				g->model[mlen] = '\0';
+			sysctl_read_str(sname, g->model, sizeof(g->model),
+			    "unknown");
+			snprintf(sname, sizeof(sname),
+			    "hw.nvidia.gpus.%d.uuid", g->dev_unit);
+			sysctl_read_str(sname, g->uuid, sizeof(g->uuid),
+			    "unknown");
+			snprintf(sname, sizeof(sname),
+			    "hw.nvidia.gpus.%d.vbios", g->dev_unit);
+			sysctl_read_str(sname, g->vbios, sizeof(g->vbios),
+			    "unknown");
+			snprintf(sname, sizeof(sname),
+			    "hw.nvidia.gpus.%d.type", g->dev_unit);
+			sysctl_read_str(sname, g->bus_type, sizeof(g->bus_type),
+			    "unknown");
+			snprintf(sname, sizeof(sname),
+			    "hw.nvidia.gpus.%d.irq", g->dev_unit);
+			g->irq = sysctl_read_int(sname, -1);
+		} else {
+			snprintf(g->model, sizeof(g->model), "unknown");
+			snprintf(g->uuid, sizeof(g->uuid), "unknown");
+			snprintf(g->vbios, sizeof(g->vbios), "unknown");
+			snprintf(g->bus_type, sizeof(g->bus_type), "unknown");
+			g->irq = -1;
 		}
 
 		memset(&info, 0, sizeof(info));

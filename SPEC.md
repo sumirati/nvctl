@@ -30,6 +30,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | :--- | :---: | :--- |
 | `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, `gpuId`, temperature, slowdown/shutdown, min/cur/def/max power cap). |
 | `nvctl list` | RO | Enumerate attached GPUs (`/dev/nvidia<N>`, PCI BDF, `gpuId`, model name). |
+| `nvctl info` | RO | Detailed `sysctl`-style key/value dump (device node, PCI BDF, model, UUID, VBIOS, bus, IRQ, driver, thermal, and power limits). |
 | `nvctl temp` | RO | Core temperature + hardware slowdown and emergency shutdown thresholds. |
 | `nvctl power` / `nvctl power get` | RO | Active power cap and hardware min / default / max bounds (watts). |
 | `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N>` when >1 GPU). |

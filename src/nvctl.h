@@ -47,7 +47,11 @@ struct nvctl_gpu {
 	uint32_t	h_sub;
 	int		dev_fd;
 	int		dev_unit;
+	int		irq;
 	char		model[96];
+	char		uuid[64];
+	char		vbios[32];
+	char		bus_type[16];
 };
 
 struct nvctl_ctx {
@@ -57,6 +61,7 @@ struct nvctl_ctx {
 	int			dev_fd_count;
 	uint32_t		h_client;
 	int			gpu_count;
+	char			driver_version[128];
 	struct nvctl_gpu	gpus[NVCTL_MAX_GPUS];
 };
 
