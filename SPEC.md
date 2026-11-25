@@ -59,7 +59,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | `0x20801801` | `16` | User | PCI IDs (`vendor`, `device`, `subvendor`, `subdevice`, `rev`). |
 | `0x20801802` | `16` | User | PCIe link caps & live control/status (`BUS_GET_INFO`: current/max gen & width). |
 | `0x20802068` | `4` | User | Current P-state bitmask (`1 << N` → `P<N>`). |
-| `0x2080261C` | `136` | User | Power cap hardware bounds (`[0x0C]` = min mW, `[0x10]` = default mW, `[0x14]` = max mW). |
+| `0x2080261C` | `136`/`72` | User | Power cap hardware bounds (`136 B` on `470+`, `72 B` on `390.xx`; `[0x0C]` = min mW, `[0x10]` = default mW, `[0x14]` = max mW). |
 | `0x2080261F` | `8` | User | Active power cap get (`[0x04]` = current cap mW). |
 | `0x2080261E` | `12` | **Root** | Active power cap set (`[0x00]=0`, `[0x04]` = target mW, `[0x08]=0`). Persists while any client holds `/dev/nvidia<N>` open. |
 
@@ -112,9 +112,9 @@ nvctl/
   * **`bhyve` with PCIe passthrough (`ppt`)** on VT-d hosts (e.g. `x79` i7-4930K) passing through a GPU (`pci0:3:0:0`) into a FreeBSD 14.3-RELEASE guest VM to test live RM ioctls on 14.x without disturbing the host OS.
 
 ### 5.3 NVIDIA Driver Branch Compatibility
+* `x11/nvidia-driver-390` (`390.157`) — **verified live** (`CHECK_VERSION_STR` handshake, `/dev/nvidia<N>` `NV01_DEVICE_0` alloc, `72 B` `0x2080261C` bounds).
 * `x11/nvidia-driver-470` (`470.256.02`) — **verified live** (Kepler/Maxwell/Pascal EOL branch; lacks `nvidia-smi`).
-* `x11/nvidia-driver-390` (`390.157`, legacy Fermi/early Kepler) — verify `0x20800501` and `0x2080261C/E/F` struct stability.
-* `x11/nvidia-driver` (current `550`/`570`/`580` production branches & `open-gpu-kernel-modules` on Turing+) — verify whether `0x20800501` and `0x2080261C/E/F` remain compatible or need a `0x20800513` (`THERMAL_SYSTEM_EXECUTE_V2`) fallback.
+* `x11/nvidia-driver` (current `550`/`570`/`580` production branches & `open-gpu-kernel-modules` on Pascal/Turing+) — verify on incoming 2× Tesla P100 16GB whether `0x20800501` and `0x2080261C/E/F` remain compatible or need a `0x20800513` (`THERMAL_SYSTEM_EXECUTE_V2`) fallback.
 
 ### 5.4 Hardware Compatibility Matrix (Easy / High-Value Targets)
 * **Kepler (`GK104`):** GeForce GTX 680 — **verified (`v0.1.0`)**.

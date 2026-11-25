@@ -3,9 +3,10 @@
 `nvctl` is a Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
 
 ## Verified Hardware
-* **Host:** Gigabyte GA-X79-UP4 Rev 1.1 + Intel Core i7-4930K, FreeBSD 15.1 (`nvidia-driver-470` `470.256.02`)
+* **Host:** Gigabyte GA-X79-UP4 Rev 1.1 + Intel Core i7-4930K, FreeBSD 15.1
+* **Verified Driver Branches:** `x11/nvidia-driver-390` (`390.157`) and `x11/nvidia-driver-470` (`470.256.02`)
 * **GPU:** Gigabyte GeForce GTX 680 OC-4GD (`GK104`, `/dev/nvidia2` in 3-GPU mixed AMD+NVIDIA rig)
-* **Verified Capabilities:** Live die temperature (`36 C`, slowdown `94 C`, shutdown `125 C`), hardware power bounds (`120..260 W`, default `235 W`), live runtime power capping (`sudo nvctl -d 0 power set 150`), and zero-CPU persistence (`nvctl persist`).
+* **Verified Capabilities:** Live die temperature (`36 C`, slowdown `94 C`, shutdown `125 C`), hardware power bounds (`120..260 W`, default `235 W`), live runtime power capping (`sudo nvctl -d 0 power set 150`), zero-CPU persistence (`nvctl persist`, `rc.d/nvctl_persist`), `sysctl`-style `nvctl info`, and `nvidia-smi` (`--sm`) / `nvidia-persistenced` (`--bd`) compatibility modes.
 
 ## Build
 ```sh
