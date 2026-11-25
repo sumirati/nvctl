@@ -111,7 +111,7 @@ sysctl_read_int(const char *name, int fallback)
 
 static uint32_t
 rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
-    uint32_t cls, void *parms, uint32_t *out_handle)
+    uint32_t cls, void *parms, uint32_t *out_handle, int verbose)
 {
 	struct nv_os21_params p;
 
@@ -123,8 +123,10 @@ rm_alloc(int fd, uint32_t root, uint32_t parent, uint32_t obj,
 	p.parms = parms;
 
 	if (ioctl(fd, NV_IOC(NV_ESC_RM_ALLOC, struct nv_os21_params), &p) < 0) {
-		fprintf(stderr, "nvctl: ioctl(NV_ESC_RM_ALLOC, cls=0x%X): %s\n",
-		    cls, strerror(errno));
+		if (verbose >= 2)
+			fprintf(stderr,
+			    "[vv] ioctl(NV_ESC_RM_ALLOC, cls=0x%X): %s\n",
+			    cls, strerror(errno));
 		return (0xFFFFFFFFU);
 	}
 	if (out_handle != NULL)
@@ -263,7 +265,7 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		uint32_t root_out = 0;
 
 		st = rm_alloc(ctx->ctl_fd, 0, 0, 0, NV01_ROOT_USER, &root_out,
-		    &ctx->h_client);
+		    &ctx->h_client, verbose);
 		if (st == NV_OK && ctx->h_client == 0 && root_out != 0)
 			ctx->h_client = root_out;
 	}
@@ -353,23 +355,14 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		memset(&devp, 0, sizeof(devp));
 		devp.device_id = g->device_instance;
 		st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
-		    g->h_dev, NV01_DEVICE_0, &devp, NULL);
-		if (st != NV_OK) {
-			/* 390.xx fallback 1: explicit h_client_share */
-			devp.h_client_share = ctx->h_client;
-			st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
-			    g->h_dev, NV01_DEVICE_0, &devp, NULL);
-		}
-		if (st != NV_OK) {
-			/* 390.xx fallback 2: NULL parms (default device 0) */
-			st = rm_alloc(ctx->ctl_fd, ctx->h_client, ctx->h_client,
-			    g->h_dev, NV01_DEVICE_0, NULL, NULL);
-		}
+		    g->h_dev, NV01_DEVICE_0, &devp, NULL, verbose);
 		if (st != NV_OK && ctx->dev_fd_count > 0) {
-			/* 390.xx fallback 3: alloc on /dev/nvidia<N> fd */
-			st = rm_alloc(ctx->dev_fds[0], ctx->h_client,
-			    ctx->h_client, g->h_dev, NV01_DEVICE_0,
-			    &devp, NULL);
+			/* 390.xx allocates NV01_DEVICE_0 on /dev/nvidia<N>. */
+			int dfd = (ctx->gpu_count < ctx->dev_fd_count) ?
+			    ctx->dev_fds[ctx->gpu_count] : ctx->dev_fds[0];
+			devp.h_client_share = ctx->h_client;
+			st = rm_alloc(dfd, ctx->h_client, ctx->h_client,
+			    g->h_dev, NV01_DEVICE_0, &devp, NULL, verbose);
 		}
 		if (st != NV_OK) {
 			if (verbose)
@@ -384,7 +377,7 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 		memset(&subp, 0, sizeof(subp));
 		subp.subdevice_id = g->subdevice_instance;
 		st = rm_alloc(ctx->ctl_fd, ctx->h_client, g->h_dev,
-		    g->h_sub, NV20_SUBDEVICE_0, &subp, NULL);
+		    g->h_sub, NV20_SUBDEVICE_0, &subp, NULL, verbose);
 		if (st != NV_OK) {
 			if (verbose)
 				fprintf(stderr,

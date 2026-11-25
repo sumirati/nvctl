@@ -419,6 +419,89 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 		printf("    items: link_caps=0x%X link_ctrl=0x%X gen_info=0x%X\n",
 		    bus_items[0].data, bus_items[1].data, bus_items[2].data);
 
+	/* Sweep 0x2080261C size if 136 B returned 0x3A (e.g. 390.xx) */
+	{
+		uint32_t sz;
+
+		memset(buf, 0, 256);
+		if (nv_rm_control(ctx, ctx->gpus[idx].h_sub,
+		    PMGR_PWR_LIMIT_BOUNDS_CMD, buf,
+		    PMGR_PWR_LIMIT_BOUNDS_SZ) == NV_ERR_INVALID_PARAM_STRUCT) {
+			for (sz = 32; sz <= 256; sz += 4) {
+				memset(buf, 0, sz);
+				st = nv_rm_control(ctx, ctx->gpus[idx].h_sub,
+				    PMGR_PWR_LIMIT_BOUNDS_CMD, buf, sz);
+				if (st == NV_OK) {
+					printf("  pwr_bounds_alt 0x%08X (%4u B) -> 0x00 (OK)\n",
+					    PMGR_PWR_LIMIT_BOUNDS_CMD, sz);
+					if (verbose >= 2) {
+						printed = 0;
+						printf("    words:");
+						for (off = 0; off + 4 <= sz &&
+						    printed < 16; off += 4) {
+							memcpy(&val, buf + off, sizeof(val));
+							if (val != 0) {
+								printf(" [0x%X]=%u(0x%X)",
+								    off, val, val);
+								printed++;
+							}
+						}
+						printf("\n");
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	/* Probe BUS_GET_INFO (0x20801802): link_caps(3), link_ctrl(7) only */
+	memset(bus_items, 0, sizeof(bus_items));
+	bus_items[0].index = 0x03U;
+	bus_items[1].index = 0x07U;
+	memset(&lp, 0, sizeof(lp));
+	lp.list_size = 2U;
+	lp.list_ptr = (uint64_t)(uintptr_t)bus_items;
+	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801802U,
+	    &lp, sizeof(lp));
+	printf("  %-14s 0x%08X (%4zu B) -> 0x%02X%s\n",
+	    "bus_get_info2", 0x20801802U, sizeof(lp), st,
+	    (st == NV_OK) ? " (OK)" : "");
+	if (verbose >= 2 && st == NV_OK)
+		printf("    items: link_caps=0x%X link_ctrl=0x%X\n",
+		    bus_items[0].data, bus_items[1].data);
+
+	/* Probe GR_GET_INFO (0x20801201) 16 B vs 32 B */
+	{
+		struct rm_info_item gi[5];
+		struct rm_gr_info_params gp;
+
+		memset(gi, 0, sizeof(gi));
+		gi[0].index = 0x0CU;
+		gi[1].index = 0x07U;
+		gi[2].index = 0x09U;
+		gi[3].index = 0x1DU;
+		gi[4].index = 0x0DU;
+		memset(&lp, 0, sizeof(lp));
+		lp.list_size = 5U;
+		lp.list_ptr = (uint64_t)(uintptr_t)gi;
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
+		    &lp, sizeof(lp));
+		printf("  %-14s 0x%08X (%4zu B) -> 0x%02X%s\n",
+		    "gr_info_16", 0x20801201U, sizeof(lp), st,
+		    (st == NV_OK) ? " (OK)" : "");
+		if (verbose >= 2 && st == NV_OK)
+			printf("    items: sm_ver=0x%X gpc=%u sm=%u cores=%u warps=%u\n",
+			    gi[0].data, gi[1].data, gi[2].data, gi[3].data, gi[4].data);
+		memset(&gp, 0, sizeof(gp));
+		gp.list_size = 5U;
+		gp.list_ptr = (uint64_t)(uintptr_t)gi;
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
+		    &gp, sizeof(gp));
+		printf("  %-14s 0x%08X (%4zu B) -> 0x%02X%s\n",
+		    "gr_info_32", 0x20801201U, sizeof(gp), st,
+		    (st == NV_OK) ? " (OK)" : "");
+	}
+
 	/* Probe CLK_GET_INFO (0x20801002) using only domains from 0x20801001 */
 	{
 		struct rm_clk_info_item clk_items[2];
