@@ -1,24 +1,24 @@
 # `nvctl` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
-`nvctl` is a zero-dependency, BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
+`nvctl` is a BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
 
 ## Verified Hardware
 * **Host:** Gigabyte GA-X79-UP4 Rev 1.1 + Intel Core i7-4930K, FreeBSD 15.1 (`nvidia-driver-470` `470.256.02`)
 * **GPU:** Gigabyte GeForce GTX 680 OC-4GD (`GK104`, `/dev/nvidia2` in 3-GPU mixed AMD+NVIDIA rig)
-* **Verified Capabilities:** Live die temp (`36 C`, slowdown `94 C`, shutdown `125 C`), hardware power bounds (`120..260 W`, default `235 W`), live runtime power capping (`sudo nvctl -d 0 power set 150`), and zero-CPU persistence (`nvctl persist`).
+* **Verified Capabilities:** Live die temperature (`36 C`, slowdown `94 C`, shutdown `125 C`), hardware power bounds (`120..260 W`, default `235 W`), live runtime power capping (`sudo nvctl -d 0 power set 150`), and zero-CPU persistence (`nvctl persist`).
 
 ## Build
 ```sh
 make
 ```
-Compiles cleanly with `cc -O2 -Wall -Wextra -Werror -std=c11` (zero external dependencies).
+Compiles cleanly with `cc -O2 -Wall -Wextra -Werror -std=c11`.
 
 ## Quick Usage
 ```sh
 nvctl                             # Multi-GPU summary table (alias: nvctl status)
 nvctl list                        # Enumerate attached GPUs (gpuId, dev, subdev)
-nvctl temp                        # GPU core temp + slowdown/shutdown thresholds
-nvctl -q -d 0 temp                # Bare numeric temp for shell scripts
+nvctl temp                        # GPU core temperature + slowdown/shutdown thresholds
+nvctl -q -d 0 temp                # Bare numeric temperature for shell scripts
 nvctl -j status                   # JSON output for node_exporter / dashboards
 nvctl power                       # Active power cap + min/default/max bounds
 nvctl persist &                   # Zero-CPU persistence holder (keeps power cap sticky)
