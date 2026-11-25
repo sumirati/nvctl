@@ -201,28 +201,40 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 	/*
 	 * Legacy branches (e.g. 390.xx) require NV_ESC_CHECK_VERSION_STR
 	 * handshake on /dev/nvidiactl before accepting NV_ESC_RM_ALLOC.
+	 * Pass the short version string parsed from hw.nvidia.version with
+	 * NV_RM_API_VERSION_CMD_RELAXED ('1').
 	 */
 	{
 		struct nv_ioctl_rm_api_version ver;
+		const char *p;
+		const char *start;
+		size_t n;
 
 		memset(&ver, 0, sizeof(ver));
-		ver.cmd = '2'; /* NV_RM_API_VERSION_CMD_QUERY */
+		ver.cmd = '1'; /* NV_RM_API_VERSION_CMD_RELAXED */
+		for (p = ctx->driver_version; *p != '\0'; ) {
+			while (*p == ' ' || *p == '\t')
+				p++;
+			start = p;
+			while (*p != '\0' && *p != ' ' && *p != '\t')
+				p++;
+			if (start[0] >= '0' && start[0] <= '9' &&
+			    memchr(start, '.', (size_t)(p - start)) != NULL) {
+				n = (size_t)(p - start);
+				if (n >= sizeof(ver.version_string))
+					n = sizeof(ver.version_string) - 1;
+				memcpy(ver.version_string, start, n);
+				ver.version_string[n] = '\0';
+				break;
+			}
+		}
 		if (ioctl(ctx->ctl_fd,
 		    NV_IOC(NV_ESC_CHECK_VERSION_STR,
 		    struct nv_ioctl_rm_api_version), &ver) == 0) {
 			if (verbose)
 				fprintf(stderr,
-				    "[v] CHECK_VERSION_STR query='%s' reply=%u\n",
+				    "[v] CHECK_VERSION_STR ver='%s' reply=%u\n",
 				    ver.version_string, ver.reply);
-			ver.cmd = 0; /* NV_RM_API_VERSION_CMD_STRICT */
-			ver.reply = 0;
-			(void)ioctl(ctx->ctl_fd,
-			    NV_IOC(NV_ESC_CHECK_VERSION_STR,
-			    struct nv_ioctl_rm_api_version), &ver);
-			if (verbose)
-				fprintf(stderr,
-				    "[v] CHECK_VERSION_STR strict reply=%u\n",
-				    ver.reply);
 		} else if (verbose) {
 			fprintf(stderr,
 			    "[v] CHECK_VERSION_STR ioctl failed: %s\n",
