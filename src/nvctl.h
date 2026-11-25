@@ -96,6 +96,8 @@ struct nvctl_hwinfo {
 	uint32_t	vram_free_mb;
 	uint32_t	vram_bus_width;
 	uint32_t	vram_type;
+	uint32_t	fb_partitions;
+	uint32_t	l2_cache_kb;
 	int		pcie_valid;
 	uint32_t	pcie_gen;
 	uint32_t	pcie_width;
@@ -103,6 +105,7 @@ struct nvctl_hwinfo {
 	uint32_t	pcie_max_width;
 	int		gr_valid;
 	uint32_t	sm_version;
+	uint32_t	gpc_count;
 	uint32_t	sm_count;
 	uint32_t	cuda_cores;
 	uint32_t	max_warps_per_sm;

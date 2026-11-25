@@ -142,10 +142,11 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    "\"current_gbs\":%.1f,"
 			    "\"max_gen\":%u,\"max_width\":%u,\"max_gbs\":%.1f},"
 			    "\"compute\":{\"sm_version\":\"%u.%u\","
-			    "\"sm_count\":%u,\"cuda_cores\":%u,"
-			    "\"max_warps_per_sm\":%u},"
+			    "\"gpc_count\":%u,\"sm_count\":%u,"
+			    "\"cuda_cores\":%u,\"max_warps_per_sm\":%u},"
 			    "\"memory\":{\"total_mb\":%u,\"free_mb\":%u,"
-			    "\"type\":\"%s\",\"bus_width_bits\":%u},"
+			    "\"type\":\"%s\",\"bus_width_bits\":%u,"
+			    "\"fb_partitions\":%u,\"l2_cache_kb\":%u},"
 			    "\"pstate\":%d,"
 			    "\"temperature\":{\"core_c\":%d,\"slowdown_c\":%u,"
 			    "\"shutdown_c\":%u},"
@@ -165,9 +166,11 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    nv_pcie_gbs(hw.pcie_max_gen, hw.pcie_max_width),
 			    (hw.sm_version >> 8) & 0xFFU,
 			    hw.sm_version & 0xFFU,
-			    hw.sm_count, hw.cuda_cores, hw.max_warps_per_sm,
+			    hw.gpc_count, hw.sm_count, hw.cuda_cores,
+			    hw.max_warps_per_sm,
 			    hw.vram_total_mb, hw.vram_free_mb,
 			    nv_ram_type_str(hw.vram_type), hw.vram_bus_width,
+			    hw.fb_partitions, hw.l2_cache_kb,
 			    hw.pstate,
 			    th.valid ? th.core_temp_c : -1,
 			    th.slowdown_c, th.shutdown_c,
@@ -213,6 +216,8 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 				printf("gpu%d.compute.sm_version: %u.%u\n", i,
 				    (hw.sm_version >> 8) & 0xFFU,
 				    hw.sm_version & 0xFFU);
+				printf("gpu%d.compute.gpc_count: %u\n", i,
+				    hw.gpc_count);
 				printf("gpu%d.compute.sm_count: %u\n", i,
 				    hw.sm_count);
 				printf("gpu%d.compute.cuda_cores: %u\n", i,
@@ -229,6 +234,11 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 				    nv_ram_type_str(hw.vram_type));
 				printf("gpu%d.memory.bus_width_bits: %u\n", i,
 				    hw.vram_bus_width);
+				printf("gpu%d.memory.fb_partitions: %u\n", i,
+				    hw.fb_partitions);
+				if (hw.l2_cache_kb > 0)
+					printf("gpu%d.memory.l2_cache_kb: %u\n",
+					    i, hw.l2_cache_kb);
 			}
 			if (hw.pstate >= 0)
 				printf("gpu%d.perf.pstate: P%d\n", i,

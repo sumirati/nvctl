@@ -22,6 +22,7 @@ static const struct probe_target k_targets[] = {
 	{ "pwr_pol_bounds", 0x2080261CU,  136U },
 	{ "pwr_lim_get",    0x2080261FU,    8U },
 	{ "perf_pstate",    0x20802068U,    4U },
+	{ "clk_domains",    0x20801001U,    8U },
 	{ "bus_pci_info",   0x20801801U,   16U },
 	{ "fan_2702",       0x20802702U,    4U },
 	{ "fan_2703",       0x20802703U,   16U },
@@ -48,6 +49,20 @@ struct rm_gr_info_params {
 	uint32_t	route_flags;
 	uint32_t	route_pad;
 	uint64_t	route_val;
+};
+
+struct rm_clk_info_item {
+	uint32_t	flags;
+	uint32_t	clk_domain;
+	uint32_t	actual_freq;
+	uint32_t	target_freq;
+	uint32_t	clk_source;
+};
+
+struct rm_clk_get_info_params {
+	uint32_t	flags;
+	uint32_t	list_size;
+	uint64_t	list_ptr;
 };
 
 double
@@ -177,9 +192,9 @@ nv_ram_type_str(uint32_t ram_type)
 void
 nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 {
-	struct rm_info_item fb_items[4];
+	struct rm_info_item fb_items[6];
 	struct rm_info_item bus_items[2];
-	struct rm_info_item gr_items[4];
+	struct rm_info_item gr_items[5];
 	struct rm_info_list_params lp;
 	struct rm_gr_info_params grp;
 	uint32_t pci_buf[4];
@@ -210,8 +225,10 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 	fb_items[1].index = 0x16U; /* HEAP_FREE (KB) */
 	fb_items[2].index = 0x0BU; /* BUS_WIDTH (bits) */
 	fb_items[3].index = 0x0DU; /* RAM_TYPE */
+	fb_items[4].index = 0x04U; /* PARTITION_COUNT */
+	fb_items[5].index = 0x1BU; /* L2CACHE_SIZE (bytes) */
 	memset(&lp, 0, sizeof(lp));
-	lp.list_size = 4U;
+	lp.list_size = 6U;
 	lp.list_ptr = (uint64_t)(uintptr_t)fb_items;
 	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801301U,
 	    &lp, sizeof(lp));
@@ -221,6 +238,8 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 		out->vram_free_mb = fb_items[1].data / 1024U;
 		out->vram_bus_width = fb_items[2].data;
 		out->vram_type = fb_items[3].data;
+		out->fb_partitions = fb_items[4].data;
+		out->l2_cache_kb = fb_items[5].data / 1024U;
 	}
 
 	/* NV2080_CTRL_CMD_BUS_GET_INFO (0x20801802) */
@@ -243,17 +262,18 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 	/* NV2080_CTRL_CMD_GR_GET_INFO (0x20801201): try 32B then 16B */
 	memset(gr_items, 0, sizeof(gr_items));
 	gr_items[0].index = 0x0CU; /* SM_VERSION */
-	gr_items[1].index = 0x09U; /* SHADER_PIPE_SUB_COUNT (SM count) */
-	gr_items[2].index = 0x1DU; /* GPU_CORE_COUNT (CUDA cores) */
-	gr_items[3].index = 0x0DU; /* MAX_WARPS_PER_SM */
+	gr_items[1].index = 0x07U; /* SHADER_PIPE_COUNT (GPC count) */
+	gr_items[2].index = 0x09U; /* SHADER_PIPE_SUB_COUNT (SM count) */
+	gr_items[3].index = 0x1DU; /* GPU_CORE_COUNT (CUDA cores) */
+	gr_items[4].index = 0x0DU; /* MAX_WARPS_PER_SM */
 	memset(&grp, 0, sizeof(grp));
-	grp.list_size = 4U;
+	grp.list_size = 5U;
 	grp.list_ptr = (uint64_t)(uintptr_t)gr_items;
 	st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
 	    &grp, sizeof(grp));
 	if (st == NV_ERR_INVALID_PARAM_STRUCT) {
 		memset(&lp, 0, sizeof(lp));
-		lp.list_size = 4U;
+		lp.list_size = 5U;
 		lp.list_ptr = (uint64_t)(uintptr_t)gr_items;
 		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801201U,
 		    &lp, sizeof(lp));
@@ -261,9 +281,10 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 	if (st == NV_OK) {
 		out->gr_valid = 1;
 		out->sm_version = gr_items[0].data;
-		out->sm_count = gr_items[1].data;
-		out->cuda_cores = gr_items[2].data;
-		out->max_warps_per_sm = gr_items[3].data;
+		out->gpc_count = gr_items[1].data;
+		out->sm_count = gr_items[2].data;
+		out->cuda_cores = gr_items[3].data;
+		out->max_warps_per_sm = gr_items[4].data;
 	}
 
 	/* NV2080_CTRL_CMD_PERF_GET_CURRENT_PSTATE (0x20802068) */
@@ -354,4 +375,28 @@ nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose)
 	if (verbose >= 2 && st == NV_OK)
 		printf("    items: link_caps=0x%X link_ctrl=0x%X gen_info=0x%X\n",
 		    bus_items[0].data, bus_items[1].data, bus_items[2].data);
+
+	/* Probe CLK_GET_INFO (0x20801002): MCLK(0x10), GPC2CLK(0x10000), GPCCLK(0x1) */
+	{
+		struct rm_clk_info_item clk_items[3];
+		struct rm_clk_get_info_params cp;
+
+		memset(clk_items, 0, sizeof(clk_items));
+		clk_items[0].clk_domain = 0x00000010U; /* MCLK */
+		clk_items[1].clk_domain = 0x00010000U; /* GPC2CLK */
+		clk_items[2].clk_domain = 0x00000001U; /* GPCCLK */
+		memset(&cp, 0, sizeof(cp));
+		cp.list_size = 3U;
+		cp.list_ptr = (uint64_t)(uintptr_t)clk_items;
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801002U,
+		    &cp, sizeof(cp));
+		printf("  %-14s 0x%08X (%4zu B) -> 0x%02X%s\n",
+		    "clk_get_info", 0x20801002U, sizeof(cp), st,
+		    (st == NV_OK) ? " (OK)" : "");
+		if (verbose >= 2 && st == NV_OK)
+			printf("    clks(kHz): mclk=%u gpc2clk=%u gpcclk=%u\n",
+			    clk_items[0].actual_freq,
+			    clk_items[1].actual_freq,
+			    clk_items[2].actual_freq);
+	}
 }
