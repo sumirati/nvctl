@@ -113,7 +113,7 @@ smi_print_field(struct nvctl_ctx *ctx, int idx, const struct nvctl_hwinfo *hw,
 	uint32_t used_mb;
 
 	bus = (ctx->gpus[idx].gpu_id >> 8) & 0xFFU;
-	slot = (ctx->gpus[idx].gpu_id >> 3) & 0x1FU;
+	slot = ctx->gpus[idx].gpu_id & 0xFFU;
 	used_mb = (hw->vram_total_mb >= hw->vram_free_mb) ?
 	    (hw->vram_total_mb - hw->vram_free_mb) : 0U;
 
@@ -292,7 +292,7 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 		(void)nv_thermal_read(ctx, i, &th, 0);
 		(void)nv_power_read(ctx, i, &pw, 0);
 		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
-		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+		slot = ctx->gpus[i].gpu_id & 0xFFU;
 		used_mb = (hw.vram_total_mb >= hw.vram_free_mb) ?
 		    (hw.vram_total_mb - hw.vram_free_mb) : 0U;
 
@@ -476,7 +476,7 @@ nv_compat_smi(int argc, char *argv[])
 			return (NVCTL_EXIT_CLAMPED);
 		}
 		bus = (ctx.gpus[target].gpu_id >> 8) & 0xFFU;
-		slot = (ctx.gpus[target].gpu_id >> 3) & 0x1FU;
+		slot = ctx.gpus[target].gpu_id & 0xFFU;
 		printf("Power limit for GPU 00000000:%02X:%02X.0 was set to "
 		    "%.2f W from %.2f W.\n",
 		    bus, slot, (double)pw_after.current_mw / 1000.0,

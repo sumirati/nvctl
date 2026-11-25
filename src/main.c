@@ -79,18 +79,20 @@ cmd_list(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			snprintf(devnode, sizeof(devnode), "/dev/nvidia?");
 
 		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
-		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+		slot = ctx->gpus[i].gpu_id & 0xFFU;
 
 		if (o->json) {
 			printf("%s{\"index\":%d,\"devnode\":\"%s\","
-			    "\"pci\":\"0:%u:%u.0\",\"gpu_id\":\"0x%08X\","
+			    "\"pci\":\"%u:%u:%u.0\",\"gpu_id\":\"0x%08X\","
 			    "\"model\":\"%s\"}",
-			    first ? "" : ",", i, devnode, bus, slot,
+			    first ? "" : ",", i, devnode,
+			    (ctx->gpus[i].gpu_id >> 16) & 0xFFFFU, bus, slot,
 			    ctx->gpus[i].gpu_id, ctx->gpus[i].model);
 			first = 0;
 		} else {
-			printf("gpu%d: %-13s pci0:%u:%u:0  gpuId=0x%08X  %s\n",
-			    i, devnode, bus, slot,
+			printf("gpu%d: %-13s pci%u:%u:%u:0  gpuId=0x%08X  %s\n",
+			    i, devnode,
+			    (ctx->gpus[i].gpu_id >> 16) & 0xFFFFU, bus, slot,
 			    ctx->gpus[i].gpu_id, ctx->gpus[i].model);
 		}
 	}
@@ -127,14 +129,14 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			snprintf(devnode, sizeof(devnode), "/dev/nvidia?");
 
 		bus = (ctx->gpus[i].gpu_id >> 8) & 0xFFU;
-		slot = (ctx->gpus[i].gpu_id >> 3) & 0x1FU;
+		slot = ctx->gpus[i].gpu_id & 0xFFU;
 		nv_hwinfo_read(ctx, i, &hw);
 		(void)nv_thermal_read(ctx, i, &th, o->verbose);
 		(void)nv_power_read(ctx, i, &pw, o->verbose);
 
 		if (o->json) {
 			printf("%s{\"index\":%d,\"device\":\"%s\","
-			    "\"pci\":\"pci0:%u:%u:0\",\"gpu_id\":\"0x%08X\","
+			    "\"pci\":\"pci%u:%u:%u:0\",\"gpu_id\":\"0x%08X\","
 			    "\"pci_id\":\"%04x:%04x\","
 			    "\"pci_subsys\":\"%04x:%04x\","
 			    "\"pci_rev\":\"0x%02x\","
@@ -156,7 +158,8 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    "\"shutdown_c\":%u},"
 			    "\"power\":{\"cap_w\":%u,\"min_w\":%u,"
 			    "\"default_w\":%u,\"max_w\":%u}}",
-			    first ? "" : ",", i, devnode, bus, slot,
+			    first ? "" : ",", i, devnode,
+			    (ctx->gpus[i].gpu_id >> 16) & 0xFFFFU, bus, slot,
 			    ctx->gpus[i].gpu_id,
 			    hw.pci_vendor, hw.pci_device,
 			    hw.pci_subvendor, hw.pci_subdevice, hw.pci_rev,
@@ -186,7 +189,8 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			first = 0;
 		} else {
 			printf("gpu%d.device: %s\n", i, devnode);
-			printf("gpu%d.pci: pci0:%u:%u:0\n", i, bus, slot);
+			printf("gpu%d.pci: pci%u:%u:%u:0\n", i,
+			    (ctx->gpus[i].gpu_id >> 16) & 0xFFFFU, bus, slot);
 			if (hw.pci_valid) {
 				printf("gpu%d.pci_id: %04x:%04x\n", i,
 				    hw.pci_vendor, hw.pci_device);
