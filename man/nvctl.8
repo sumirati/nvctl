@@ -205,6 +205,19 @@ fi
 Dump full telemetry in JSON format:
 .Pp
 .Dl "nvctl -j status"
+.Pp
+Use the classic
+.Va argv[0]
+symlink trick so existing scripts calling
+.Ql nvidia-smi
+or
+.Ql nvidia-persistenced
+invoke the matching compatibility personality automatically:
+.Bd -literal -offset indent
+sudo ln -s /usr/local/sbin/nvctl /usr/local/bin/nvidia-smi
+sudo ln -s /usr/local/sbin/nvctl /usr/local/sbin/nvidia-persistenced
+nvidia-smi -L
+.Ed
 .Sh SEE ALSO
 .Xr pciconf 8 ,
 .Xr sysctl 8

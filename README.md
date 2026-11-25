@@ -1,6 +1,6 @@
 # `nvctl` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
-`nvctl` is a Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) and providing a lightweight native CLI for newer driver branches.
+`nvctl` is a Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctls) for headless FreeBSD systems—filling the gap left by the absence of `nvidia-smi` and `nvidia-persistenced` in FreeBSD's `x11/nvidia-driver-390` (Fermi/Kepler) and `x11/nvidia-driver-470` (Kepler/Maxwell/Pascal) branches, while providing a lightweight native CLI for newer driver branches.
 
 ## Verified Hardware
 * **Host:** Gigabyte GA-X79-UP4 Rev 1.1 + Intel Core i7-4930K
@@ -28,8 +28,8 @@ nvctl persist &                   # Zero-CPU persistence holder (keeps power cap
 sudo nvctl -d 0 power set 150     # Set runtime power cap to 150W (bounds-checked)
 nvctl -v status                   # Human-readable RM diagnostic trace
 nvctl -vv probe                   # Raw RM ioctl struct-size & hex word dump
-nvctl --sm                        # Emulated nvidia-smi summary (or symlink as nvidia-smi)
-nvctl --bd --pid-file /tmp/nv.pid # Emulated nvidia-persistenced daemon (or symlink)
+nvctl --sm                        # Emulated nvidia-smi (or symlink as nvidia-smi)
+nvctl --bd --pid-file /tmp/nv.pid # Emulated daemon (or symlink as nvidia-persistenced)
 ```
 
 ## Examples
@@ -52,11 +52,17 @@ nvctl_persist_power_caps="0:150"  # Or "all:150" for homogeneous multi-GPU rigs
 ```
 
 ### `nvidia-smi` & `nvidia-persistenced` Compatibility Mode
-Invoke directly via `--sm` / `--bd` (safe alongside a real `nvidia-smi`), or via symlink:
+`nvctl` is a multi-call binary that inspects `argv[0]` at startup: invoke it explicitly via `--sm` / `--bd` (safe alongside native NVIDIA binaries), or create symlinks so existing scripts calling `nvidia-smi` or `nvidia-persistenced` work drop-in:
 ```sh
+# Explicit flags (safe when native nvidia-smi is also installed)
 nvctl --sm -L
 nvctl --sm --query-gpu=index,name,temperature.gpu,power.limit,memory.used,memory.total --format=csv,noheader,nounits
 nvctl --bd --pid-file /var/run/nvctl_persist.pid
+
+# Classic Unix argv[0] symlink trick (one binary, three personalities)
+sudo ln -s /usr/local/sbin/nvctl /usr/local/bin/nvidia-smi
+sudo ln -s /usr/local/sbin/nvctl /usr/local/sbin/nvidia-persistenced
+nvidia-smi -L
 ```
 
 ### Headless Thermal Guard & Telemetry Scripting
