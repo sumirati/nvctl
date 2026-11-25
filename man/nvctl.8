@@ -20,7 +20,7 @@ The
 utility communicates directly with the NVIDIA Resource Manager (RM) kernel
 interface via
 .Pa /dev/nvidiactl
-to query hardware telemetry, enforce runtime power caps, and keep GPUs
+to query hardware telemetry, enforce runtime power caps, and maintain GPU
 state persistence while no other process is accessing the device file.
 .Pp
 When invoked with no
@@ -62,9 +62,11 @@ core temperature, hardware slowdown/shutdown thresholds, and active power
 cap bounds (min/current/default/max watts).
 This is the default command.
 .It Cm list
-Enumerate all attached NVIDIA GPUs and display their RM
+Enumerate all attached NVIDIA GPUs and display their device node
+.Pq Pa /dev/nvidia Ns Ar N ,
+PCI bus/device/function address, RM
 .Va gpuId ,
-device instance, and subdevice instance.
+and model name.
 .It Cm temp
 Query on-die GPU thermal sensor along with hardware slowdown and emergency
 shutdown thresholds.

@@ -1,7 +1,7 @@
 # `nvctl(8)` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
 ## 1. Purpose & Scope
-`nvctl` is a standalone, zero-dependency, BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD (and Linux) without X11, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
+`nvctl` is a standalone BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD (and Linux) without a running X server, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
 
 * **Primary Target:** FreeBSD 14/15 (`x11/nvidia-driver-470` EOL Kepler/Maxwell/Pascal cards, plus newer `nvidia-driver` branches where RM permits).
 * **Distribution:** Standalone repository + canonical FreeBSD Port (`sysutils/nvctl` in a separate `freebsd/freebsd-ports` fork) with `nvctl(8)` man page.
@@ -28,8 +28,8 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 ### Command Verbs
 | Command | Mode | Description |
 | :--- | :---: | :--- |
-| `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, `gpuId`, temp, slowdown/shutdown, min/cur/def/max power cap). |
-| `nvctl list` | RO | Enumerate attached GPUs (`gpuId`, `device_instance`, `subdevice_instance`). |
+| `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, `gpuId`, temperature, slowdown/shutdown, min/cur/def/max power cap). |
+| `nvctl list` | RO | Enumerate attached GPUs (`/dev/nvidia<N>`, PCI BDF, `gpuId`, model name). |
 | `nvctl temp` | RO | Core temperature + hardware slowdown and emergency shutdown thresholds. |
 | `nvctl power` / `nvctl power get` | RO | Active power cap and hardware min / default / max bounds (watts). |
 | `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N>` when >1 GPU). |
