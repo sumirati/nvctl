@@ -52,6 +52,13 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | RM Command | Size (B) | Privilege | Function & Verified Offsets |
 | :--- | :---: | :---: | :--- |
 | `0x20800501` | `1036` | User | Thermal settings/reading (`words[0]=0xFFFFFFFF` mask; `words[1]` = core °C; `words[13]>>8` = slowdown °C; `words[13]>>16` = shutdown °C). |
+| `0x20801001` | `8` | User | Clock domains bitmask (`MCLK=0x10`, `GPC2CLK=0x10000`, `GPCCLK=0x1`). |
+| `0x20801002` | `16` | User | Live clock frequencies in kHz (`CLK_GET_INFO` list: `MCLK` DDR rate, `GPC2CLK`/`GPCCLK` core rate). |
+| `0x20801201` | `32`/`16` | User | Graphics engine info (`GR_GET_INFO`: `SM_VERSION`, `GPC`, `SM`, `CUDA_CORES`, `MAX_WARPS_PER_SM`). |
+| `0x20801301` | `16` | User | Framebuffer info (`FB_GET_INFO`: `RAM_SIZE`, `HEAP_FREE`, `BUS_WIDTH`, `RAM_TYPE`, `PARTITION_COUNT`, `L2CACHE_SIZE`). |
+| `0x20801801` | `16` | User | PCI IDs (`vendor`, `device`, `subvendor`, `subdevice`, `rev`). |
+| `0x20801802` | `16` | User | PCIe link caps & live control/status (`BUS_GET_INFO`: current/max gen & width). |
+| `0x20802068` | `4` | User | Current P-state bitmask (`1 << N` → `P<N>`). |
 | `0x2080261C` | `136` | User | Power cap hardware bounds (`[0x0C]` = min mW, `[0x10]` = default mW, `[0x14]` = max mW). |
 | `0x2080261F` | `8` | User | Active power cap get (`[0x04]` = current cap mW). |
 | `0x2080261E` | `12` | **Root** | Active power cap set (`[0x00]=0`, `[0x04]` = target mW, `[0x08]=0`). Persists while any client holds `/dev/nvidia<N>` open. |

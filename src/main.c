@@ -146,7 +146,9 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    "\"cuda_cores\":%u,\"max_warps_per_sm\":%u},"
 			    "\"memory\":{\"total_mb\":%u,\"free_mb\":%u,"
 			    "\"type\":\"%s\",\"bus_width_bits\":%u,"
-			    "\"fb_partitions\":%u,\"l2_cache_kb\":%u},"
+			    "\"fb_partitions\":%u,\"l2_cache_kb\":%u,"
+			    "\"bandwidth_gbs\":%.1f},"
+			    "\"clocks\":{\"core_mhz\":%u,\"mem_mhz\":%u},"
 			    "\"pstate\":%d,"
 			    "\"temperature\":{\"core_c\":%d,\"slowdown_c\":%u,"
 			    "\"shutdown_c\":%u},"
@@ -171,6 +173,9 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			    hw.vram_total_mb, hw.vram_free_mb,
 			    nv_ram_type_str(hw.vram_type), hw.vram_bus_width,
 			    hw.fb_partitions, hw.l2_cache_kb,
+			    nv_mem_gbs(hw.mem_clk_khz, hw.vram_bus_width,
+			    hw.vram_type),
+			    hw.core_clk_khz / 1000U, hw.mem_clk_khz / 1000U,
 			    hw.pstate,
 			    th.valid ? th.core_temp_c : -1,
 			    th.slowdown_c, th.shutdown_c,
@@ -239,6 +244,18 @@ cmd_info(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 				if (hw.l2_cache_kb > 0)
 					printf("gpu%d.memory.l2_cache_kb: %u\n",
 					    i, hw.l2_cache_kb);
+				if (hw.clk_valid && hw.mem_clk_khz > 0)
+					printf("gpu%d.memory.bandwidth_gbs: %.1f\n",
+					    i, nv_mem_gbs(hw.mem_clk_khz,
+					    hw.vram_bus_width, hw.vram_type));
+			}
+			if (hw.clk_valid) {
+				if (hw.core_clk_khz > 0)
+					printf("gpu%d.clocks.core_mhz: %u\n",
+					    i, hw.core_clk_khz / 1000U);
+				if (hw.mem_clk_khz > 0)
+					printf("gpu%d.clocks.mem_mhz: %u\n",
+					    i, hw.mem_clk_khz / 1000U);
 			}
 			if (hw.pstate >= 0)
 				printf("gpu%d.perf.pstate: P%d\n", i,

@@ -81,6 +81,19 @@ nv_pcie_gbs(uint32_t gen, uint32_t width)
 	return (per_lane * (double)width);
 }
 
+double
+nv_mem_gbs(uint32_t mem_clk_khz, uint32_t bus_width_bits, uint32_t ram_type)
+{
+	double mult;
+
+	if (mem_clk_khz == 0 || bus_width_bits == 0)
+		return (0.0);
+	/* RM MCLK reports DDR half-rate (e.g. 3004 MHz for 6008 MT/s GDDR5). */
+	mult = (ram_type == 0x01U) ? 1.0 : 2.0;
+	return (((double)mem_clk_khz / 1000.0) * mult *
+	    ((double)bus_width_bits / 8.0) / 1000.0);
+}
+
 int
 nv_power_read(struct nvctl_ctx *ctx, int idx, struct nvctl_power *out,
     int verbose)
@@ -285,6 +298,36 @@ nv_hwinfo_read(struct nvctl_ctx *ctx, int idx, struct nvctl_hwinfo *out)
 		out->sm_count = gr_items[2].data;
 		out->cuda_cores = gr_items[3].data;
 		out->max_warps_per_sm = gr_items[4].data;
+	}
+
+	/* NV2080_CTRL_CMD_CLK_GET_DOMAINS (0x20801001) + CLK_GET_INFO (0x20801002) */
+	{
+		struct rm_clk_info_item clk_items[2];
+		struct rm_clk_get_info_params cp;
+		uint32_t dom[2];
+
+		memset(dom, 0, sizeof(dom));
+		st = nv_rm_control(ctx, ctx->gpus[idx].h_sub, 0x20801001U,
+		    dom, sizeof(dom));
+		if (st == NV_OK && (dom[0] & 0x00000010U) != 0) {
+			memset(clk_items, 0, sizeof(clk_items));
+			clk_items[0].clk_domain = 0x00000010U; /* MCLK */
+			clk_items[1].clk_domain = (dom[0] & 0x00010000U) ?
+			    0x00010000U : 0x00000001U; /* GPC2CLK or GPCCLK */
+			memset(&cp, 0, sizeof(cp));
+			cp.list_size = ((dom[0] & clk_items[1].clk_domain) != 0) ?
+			    2U : 1U;
+			cp.list_ptr = (uint64_t)(uintptr_t)clk_items;
+			st = nv_rm_control(ctx, ctx->gpus[idx].h_sub,
+			    0x20801002U, &cp, sizeof(cp));
+			if (st == NV_OK) {
+				out->clk_valid = 1;
+				out->mem_clk_khz = clk_items[0].actual_freq;
+				if (cp.list_size == 2U)
+					out->core_clk_khz =
+					    clk_items[1].actual_freq;
+			}
+		}
 	}
 
 	/* NV2080_CTRL_CMD_PERF_GET_CURRENT_PSTATE (0x20802068) */
