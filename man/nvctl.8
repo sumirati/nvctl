@@ -184,7 +184,6 @@ Display a status summary for all GPUs:
 .Pp
 Inspect hardware limits, start the zero-CPU persistence holder, cap GPU 0
 to 150 watts, and verify that the cap remains active:
-.Pp
 .Bd -literal -offset indent
 nvctl list
 nvctl power
@@ -194,7 +193,6 @@ nvctl power
 .Ed
 .Pp
 Poll bare core temperature of GPU 0 in a shell thermal guard:
-.Pp
 .Bd -literal -offset indent
 temp=$(nvctl -q -d 0 temp)
 if [ "$temp" -ge 85 ]; then
