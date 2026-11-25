@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +15,34 @@ on_signal(int sig)
 {
 	(void)sig;
 	g_stop = 1;
+}
+
+static int
+parse_u32(const char *s, uint32_t *out)
+{
+	char *end;
+	unsigned long val;
+
+	if (s == NULL || s[0] == '\0' || s[0] == '-')
+		return (-1);
+	errno = 0;
+	val = strtoul(s, &end, 10);
+	if (errno != 0 || *end != '\0' || val > UINT32_MAX)
+		return (-1);
+	*out = (uint32_t)val;
+	return (0);
+}
+
+static void
+reject_extra_arg(const char *verb, const char *arg)
+{
+	if (arg[0] == '-')
+		fprintf(stderr,
+		    "nvctl: unexpected option '%s' after '%s' "
+		    "(global flags must precede the command)\n", arg, verb);
+	else
+		fprintf(stderr,
+		    "nvctl: unexpected argument '%s' for '%s'\n", arg, verb);
 }
 
 static void
@@ -174,14 +204,22 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 	struct nvctl_power pw;
 	uint32_t st;
 	uint32_t watts;
+	uint32_t actual_w;
 	int target;
 	int i;
 	int first;
 	int rc;
 
 	if (argc >= 2 && strcmp(argv[1], "set") == 0) {
-		if (argc < 3) {
+		if (argc != 3) {
+			if (argc > 3)
+				reject_extra_arg("power set", argv[3]);
 			usage();
+			return (NVCTL_EXIT_USAGE);
+		}
+		if (parse_u32(argv[2], &watts) != 0) {
+			fprintf(stderr, "nvctl: invalid wattage '%s'\n",
+			    argv[2]);
 			return (NVCTL_EXIT_USAGE);
 		}
 		target = (o->device_idx >= 0) ? o->device_idx : 0;
@@ -190,7 +228,6 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 			    "nvctl: -d <index> required with multiple GPUs\n");
 			return (NVCTL_EXIT_USAGE);
 		}
-		watts = (uint32_t)strtoul(argv[2], NULL, 10);
 		rc = nv_power_set(ctx, target, watts, &st, o->verbose);
 		if (rc == -2)
 			return (NVCTL_EXIT_USAGE);
@@ -205,10 +242,35 @@ cmd_power(struct nvctl_ctx *ctx, const struct nvctl_opts *o, int argc,
 			return (st == NV_ERR_NOT_SUPPORTED) ?
 			    NVCTL_EXIT_UNSUP : NVCTL_EXIT_ERR;
 		}
-		(void)nv_power_read(ctx, target, &pw, 0);
-		printf("gpu%d: power cap set to %u W\n", target,
-		    pw.current_mw / 1000U);
+		if (nv_power_read(ctx, target, &pw, 0) != 0) {
+			fprintf(stderr,
+			    "nvctl: power cap readback failed\n");
+			return (NVCTL_EXIT_ERR);
+		}
+		actual_w = pw.current_mw / 1000U;
+		if (actual_w != watts) {
+			fprintf(stderr,
+			    "nvctl: gpu%d requested %u W, but driver clamped "
+			    "cap to %u W (default %u W, max %u W)\n",
+			    target, watts, actual_w,
+			    pw.default_mw / 1000U, pw.max_mw / 1000U);
+			return (NVCTL_EXIT_UNSUP);
+		}
+		printf("gpu%d: power cap set to %u W\n", target, actual_w);
 		return (NVCTL_EXIT_OK);
+	}
+
+	if (argc >= 2) {
+		if (strcmp(argv[1], "get") != 0) {
+			reject_extra_arg("power", argv[1]);
+			usage();
+			return (NVCTL_EXIT_USAGE);
+		}
+		if (argc > 2) {
+			reject_extra_arg("power get", argv[2]);
+			usage();
+			return (NVCTL_EXIT_USAGE);
+		}
 	}
 
 	first = 1;
@@ -297,6 +359,7 @@ main(int argc, char *argv[])
 	struct nvctl_opts opts;
 	struct nvctl_ctx ctx;
 	const char *verb;
+	uint32_t dev_u32;
 	int ch;
 	int rc;
 
@@ -308,7 +371,14 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "d:jqvh")) != -1) {
 		switch (ch) {
 		case 'd':
-			opts.device_idx = atoi(optarg);
+			if (parse_u32(optarg, &dev_u32) != 0 ||
+			    dev_u32 >= NVCTL_MAX_GPUS) {
+				fprintf(stderr,
+				    "nvctl: invalid device index '%s'\n",
+				    optarg);
+				return (NVCTL_EXIT_USAGE);
+			}
+			opts.device_idx = (int)dev_u32;
 			break;
 		case 'j':
 			opts.json = 1;
@@ -329,6 +399,19 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	verb = (argc > 0) ? argv[0] : "status";
+
+	if (strcmp(verb, "status") != 0 && strcmp(verb, "list") != 0 &&
+	    strcmp(verb, "temp") != 0 && strcmp(verb, "power") != 0 &&
+	    strcmp(verb, "persist") != 0 && strcmp(verb, "probe") != 0) {
+		fprintf(stderr, "nvctl: unknown command '%s'\n", verb);
+		usage();
+		return (NVCTL_EXIT_USAGE);
+	}
+	if (strcmp(verb, "power") != 0 && argc > 1) {
+		reject_extra_arg(verb, argv[1]);
+		usage();
+		return (NVCTL_EXIT_USAGE);
+	}
 
 	if (nv_ctx_open(&ctx, opts.verbose) != 0)
 		return (NVCTL_EXIT_ERR);
@@ -356,12 +439,8 @@ main(int argc, char *argv[])
 		rc = cmd_power(&ctx, &opts, argc, argv);
 	else if (strcmp(verb, "persist") == 0)
 		rc = cmd_persist(&ctx, &opts);
-	else if (strcmp(verb, "probe") == 0)
+	else
 		rc = cmd_probe(&ctx, &opts);
-	else {
-		usage();
-		rc = NVCTL_EXIT_USAGE;
-	}
 
 	nv_ctx_close(&ctx);
 	return (rc);
