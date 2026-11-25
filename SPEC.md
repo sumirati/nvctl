@@ -4,7 +4,7 @@
 `nvctl` is a standalone, zero-dependency, BSD-2-Clause C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD (and Linux) without X11, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
 
 * **Primary Target:** FreeBSD 14/15 (`x11/nvidia-driver-470` EOL Kepler/Maxwell/Pascal cards, plus newer `nvidia-driver` branches where RM permits).
-* **Distribution:** Standalone repository (`local` GitLab $\rightarrow$ public GitHub) + canonical FreeBSD Port (`sysutils/nvctl` in a separate `freebsd/freebsd-ports` fork) with `nvctl(8)` man page.
+* **Distribution:** Standalone repository + canonical FreeBSD Port (`sysutils/nvctl` in a separate `freebsd/freebsd-ports` fork) with `nvctl(8)` man page.
 
 ---
 
