@@ -1,7 +1,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.\" Copyright (c) 2026 Golem Project Contributors
+.\" Copyright (c) 2026 sumirati@buggycode.net
 .\"
 .Dd November 25, 2026
 .Dt NVCTL 8
@@ -20,14 +20,8 @@ The
 utility communicates directly with the NVIDIA Resource Manager (RM) kernel
 interface via
 .Pa /dev/nvidiactl
-to query hardware telemetry, enforce runtime power caps, and hold GPUs
-initialized on headless
-.Fx
-systems without requiring X11,
-.Ql nvidia-settings ,
-.Ql nvidia-smi ,
-or
-.Ql nvidia-persistenced .
+to query hardware telemetry, enforce runtime power caps, and keep GPUs
+state persistence while no other process is accessing the device file.
 .Pp
 When invoked with no
 .Ar command ,
@@ -149,4 +143,4 @@ Dump full telemetry in JSON format:
 .Xr pciconf 8 ,
 .Xr sysctl 8
 .Sh AUTHORS
-.An Golem v1 Community Preservation Lab
+.An sumirati@buggycode.net
