@@ -30,7 +30,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | :--- | :---: | :--- |
 | `nvctl` / `nvctl status` | RO | Multi-GPU summary table (index, `gpuId`, temperature, slowdown/shutdown, min/cur/def/max power cap). |
 | `nvctl list` | RO | Enumerate attached GPUs (`/dev/nvidia<N>`, PCI BDF, `gpuId`, model name). |
-| `nvctl info` | RO | Detailed `sysctl`-style key/value dump (device node, PCI BDF, model, UUID, VBIOS, bus, IRQ, driver, thermal, and power limits). |
+| `nvctl info` | RO | Detailed `sysctl`-style key/value dump (device node, PCI BDF/IDs, PCIe gen/width/GB/s, model, UUID, VBIOS, bus, IRQ, driver, SM/GPC/CUDA cores, VRAM/L2/bandwidth, live clocks, P-state, thermal, and power limits). |
 | `nvctl temp` | RO | Core temperature + hardware slowdown and emergency shutdown thresholds. |
 | `nvctl power` / `nvctl power get` | RO | Active power cap and hardware min / default / max bounds (watts). |
 | `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N>` when >1 GPU). |
@@ -81,7 +81,7 @@ Compatibility personalities must strictly mirror native NVIDIA CLI semantics and
 
 ## 4. Coding & Repository Standards
 
-1. **FreeBSD `style(9)` Compliance:** Top-of-block variable declarations, explicit `NV_ESC_RM_FREE` teardown on every exit path, zero warnings under `-O2 -Wall -Wextra -Werror -std=c11`.
+1. **FreeBSD `style(9)` Compliance:** Top-of-block variable declarations, explicit `NV_ESC_RM_FREE` teardown on every exit path, zero warnings under `-O2 -Wall -Wextra -Werror -std=gnu11`.
 2. **Canonical Packaging Separation:** `nvctl` contains only upstream source + man page and cuts signed tags (`v0.1.0`). The FreeBSD Port (`sysutils/nvctl`) lives separately on a branch of a `freebsd/freebsd-ports` fork referencing the tagged release tarball (`USE_GITHUB=yes`) to avoid circular `distinfo` hashing.
 
 ```text

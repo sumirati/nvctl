@@ -12,7 +12,7 @@
 ```sh
 make
 ```
-Compiles cleanly with `cc -O2 -Wall -Wextra -Werror -std=c11`.
+Compiles cleanly with `cc -O2 -Wall -Wextra -Werror -std=gnu11`.
 
 ## Quick Usage
 ```sh
