@@ -281,9 +281,9 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 	printf("+-----------------------------------------------------------------------------+\n");
 	printf("| nvctl (nvidia-smi compat)          Driver Version: %-24.24s |\n",
 	    drv);
-	printf("|----+--------------------------+------------------+--------------------------|\n");
-	printf("| GPU| Name                     | Bus-Id           | Temp  Perf  Cap   Memory |\n");
-	printf("|====+==========================+==================+==========================|\n");
+	printf("|----+------------------------+------------------+----------------------------|\n");
+	printf("| GPU| Name                   | Bus-Id           | Temp Perf Cap       Memory |\n");
+	printf("|====+========================+==================+============================|\n");
 
 	for (i = 0; i < ctx->gpu_count; i++) {
 		if (dev_idx >= 0 && dev_idx != i)
@@ -296,8 +296,8 @@ smi_print_table(struct nvctl_ctx *ctx, int dev_idx)
 		used_mb = (hw.vram_total_mb >= hw.vram_free_mb) ?
 		    (hw.vram_total_mb - hw.vram_free_mb) : 0U;
 
-		printf("| %2d | %-24.24s | 00000000:%02X:%02X.0 | "
-		    "%3dC  P%-2d  %3uW %4u/%4uM |\n",
+		printf("| %2d | %-22.22s | 00000000:%02X:%02X.0 | "
+		    "%3dC P%-2d %3uW %5u/%5uM |\n",
 		    i, ctx->gpus[i].model, bus, slot,
 		    th.valid ? th.core_temp_c : -1,
 		    (hw.pstate >= 0) ? hw.pstate : 0,
