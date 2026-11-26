@@ -157,3 +157,10 @@ nvctl/
 * **`freebsd-ports@freebsd.org`** — once `sysutils/nvctl` is submitted/landed.
 * **`freebsd-hackers@freebsd.org`** — brief `[ANN]` note for systems developers.
 * **FreeBSD Forums** (`forums.freebsd.org` → *Hardware* / *Display Drivers*) and **`r/freebsd`** — primary reach for headless FreeBSD server/homelab users on `nvidia-driver-390`/`470` (high value for free multi-card hardware QA reports).
+
+### 5.7 Extended Historical & Bleeding-Edge FreeBSD `bhyve` `ppt` Matrix
+* **Forward-Looking Releases (from `freebsd.org/where/`):**
+  * **FreeBSD 15.2-BETA / RELEASE** (`bhyve` + `ppt` passthrough, verifying `390.157`, `470.256.02`, and `550`/`570`/`580`).
+  * **FreeBSD 16-CURRENT** (`bhyve` + `ppt` + `poudriere` build check).
+* **Historical / Age-Aligned Archive Releases (from `ftp-archive.freebsd.org`, optional):**
+  * Walk backwards through archived EOL releases (`13.5-RELEASE` → `12.4` → `11.4` → `10.4` → `9.x`, age-aligned with the 2012 `GK104` GTX 680 launch era) inside `bhyve` + `ppt` to map the exact historical boundary of `NV_ESC_RM_ALLOC` / `CHECK_VERSION_STR` / `nvidia-driver-304`/`340`/`390` compatibility.
