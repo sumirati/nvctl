@@ -1,7 +1,7 @@
 # `nvctl(8)` — Headless NVIDIA GPU Control & Telemetry Utility for FreeBSD
 
 ## 1. Purpose & Scope
-`nvctl` is a standalone Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD (and Linux) without a running X server, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
+`nvctl` is a standalone Beerware-licensed C utility that talks directly to `/dev/nvidiactl` (NVIDIA Resource Manager ioctl interface) to provide headless telemetry, runtime power capping, and GPU persistence on FreeBSD without a running X server, `nvidia-settings`, `nvidia-smi`, or `nvidia-persistenced`.
 
 * **Primary Target:** FreeBSD 14/15 (`x11/nvidia-driver-470` EOL Kepler/Maxwell/Pascal cards, plus newer `nvidia-driver` branches where RM permits).
 * **Distribution:** Standalone repository + canonical FreeBSD Port (`sysutils/nvctl` in a separate `freebsd/freebsd-ports` fork) with `nvctl(8)` man page.
@@ -22,7 +22,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | :---: | :--- |
 | `-d <N\|all>` | Target GPU device index `N` or `all` attached GPUs (default: all on RO; required on RW when >1 GPU). |
 | `-j` | Machine-readable JSON output (for `node_exporter`, dashboards, BMC). |
-| `-q` | Quiet / raw scalar output for shell scripting (e.g., `36` instead of `36 C`). |
+| `-q` | Quiet / raw scalar output for shell scripting (`temp`: `<core_c>`, `power`: `<cap_w>`, `status`: `<core_c> <cap_w>`). On failure, nothing is printed to `stdout`; errors go to `stderr` with a non-zero exit code. |
 | `-v` | Verbose human-readable diagnostic trace on `stderr`. Stackable (`-vv`) for raw RM ioctl hex word dumps. |
 
 ### Command Verbs
@@ -33,7 +33,7 @@ nvctl [-jqv] [-d index] [command [subcommand] [args...]]
 | `nvctl info` | RO | Detailed `sysctl`-style key/value dump (device node, PCI BDF/IDs, PCIe gen/width/GB/s, model, UUID, VBIOS, bus, IRQ, driver, SM/GPC/CUDA cores, VRAM/L2/bandwidth, live clocks, P-state, thermal, and power limits). |
 | `nvctl temp` | RO | Core temperature + hardware slowdown and emergency shutdown thresholds. |
 | `nvctl power` / `nvctl power get` | RO | Active power cap and hardware min / default / max bounds (watts). |
-| `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N>` when >1 GPU). |
+| `nvctl power set <watts>` | **RW** | Set runtime power cap (bounds-checked against hardware min..max; requires `sudo` and `-d <N\|all>` when >1 GPU). Always reads back the live cap to detect driver clamping (exit `4`). On `470+`, closing all `/dev/nvidia*` clients (stopping `persist` or rebooting without `rc.d/nvctl_persist`) resets the cap to VBIOS default. |
 | `nvctl persist` | RO | Zero-CPU (`pause()`) persistence holder keeping `/dev/nvidiactl` + `/dev/nvidia*` open so runtime power caps survive idle periods (`SIGINT`/`SIGTERM` clean teardown). |
 | `nvctl probe` | RO | Read-only RM ioctl capability & ABI probe (`-vv` dumps non-zero `u32` words). |
 
@@ -82,7 +82,7 @@ Compatibility personalities must strictly mirror native NVIDIA CLI semantics and
 ## 4. Coding & Repository Standards
 
 1. **FreeBSD `style(9)` Compliance:** Top-of-block variable declarations, explicit `NV_ESC_RM_FREE` teardown on every exit path, zero warnings under `-O2 -Wall -Wextra -Werror -std=gnu11`.
-2. **Canonical Packaging Separation:** `nvctl` contains only upstream source + man page and cuts signed tags (`v0.1.0`). The FreeBSD Port (`sysutils/nvctl`) lives separately on a branch of a `freebsd/freebsd-ports` fork referencing the tagged release tarball (`USE_GITHUB=yes`) to avoid circular `distinfo` hashing.
+2. **Canonical Packaging Separation:** `nvctl` contains only upstream source + man page and cuts signed tags (`v0.4.0`). The FreeBSD Port (`sysutils/nvctl`) lives separately in `overlay-freebsd-ports` referencing the tagged release tarball (`USE_GITLAB=yes`) to avoid circular `distinfo` hashing.
 
 ```text
 nvctl/
@@ -134,7 +134,7 @@ nvctl/
   * **FreeBSD `main` (`15`/`16-CURRENT`)** — compile & port check via `poudriere`.
 * **Test Method:**
   * `poudriere` jails for clean build/packaging verification across all supported FreeBSD releases.
-  * **`bhyve` with PCIe passthrough (`ppt`)** on VT-d hosts (e.g. `x79` i7-4930K) passing through a GPU (`pci0:3:0:0`) into a FreeBSD 14.3-RELEASE guest VM to test live RM ioctls on 14.x without disturbing the host OS.
+  * **`bhyve` with PCIe passthrough (`ppt`)** on VT-d hosts (e.g. `x79` i7-4930K) passing through a GPU (`pci0:3:0:0`) into a FreeBSD 14.5-RELEASE guest VM to test live RM ioctls on 14.x without disturbing the host OS.
 
 ### 5.3 NVIDIA Driver Branch Compatibility
 * `x11/nvidia-driver-390` (`390.157`) — **verified live** (`CHECK_VERSION_STR` handshake, `/dev/nvidia<N>` `NV01_DEVICE_0` alloc, `72 B` `0x2080261C` bounds).
@@ -146,7 +146,7 @@ nvctl/
 * **Low-end / No-Power-Cap Kepler (`GK208` / `GK107`):** GT 710 / GT 730 / Quadro K620 (~€10–25 used) — validates graceful `NVCTL_EXIT_UNSUP` (`3`) handling on cards without software power capping.
 * **Maxwell (`GM107` / `GM200`):** GTX 750 Ti / Quadro M2000 / Tesla M40.
 * **Pascal (`GP100` / `GP104`):** Tesla P100 16GB (`SM 6.0`, `HBM2`, `4096`-bit bus → verifies `HBM2` RAM type + `732 GB/s` bandwidth + 150 W cap) and GTX 1060 / Tesla P4.
-* **Multi-GPU NVIDIA Rig:** 2+ NVIDIA cards simultaneously to verify `-d <N>` enforcement on `power set` and `/dev/nvidia<N>` mapping with `gpu_count > 1`.
+* **Multi-GPU NVIDIA Rig:** 2+ NVIDIA cards simultaneously to verify `-d <N|all>` enforcement on `power set` and replace positional `/dev/nvidia<N>` mapping with PCI-BDF matching (`dev.vgapci.<N>.%location` ↔ `gpu_id`) when `gpu_count > 1`.
 
 ### 5.5 Native FreeBSD `libnvidia-ml.so.1` (NVML Shim)
 * Build an optional shared library (`libnvidia-ml.so.1`, opt-in Port option `NVML_SHIM`) directly on top of `nvctl`'s verified `rm_ioctl.c` / `rm_thermal.c` / `rm_pmgr.c` core — keeping the entire FreeBSD NVIDIA userland replica in one cohesive codebase rather than duplicating RM ABI logic across repos.

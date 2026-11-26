@@ -45,7 +45,6 @@ struct nvctl_gpu {
 	uint32_t	subdevice_instance;
 	uint32_t	h_dev;
 	uint32_t	h_sub;
-	int		dev_fd;
 	int		dev_unit;
 	int		irq;
 	char		model[96];

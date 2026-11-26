@@ -53,7 +53,19 @@ Emit machine-readable JSON output suitable for
 dashboards, or external BMC controllers.
 .It Fl q
 Quiet / raw scalar mode for shell scripting (prints bare numeric values
-without units or table headers).
+without units or table headers:
+.Cm temp
+prints core temperature in Celsius,
+.Cm power
+prints active cap in watts,
+.Cm status
+prints
+.Dq temp watts ) .
+On failure, nothing is written to
+.Va stdout ;
+diagnostics go to
+.Va stderr
+with a non-zero exit status.
 .It Fl v
 Enable human-readable RM diagnostics on
 .Va stderr .

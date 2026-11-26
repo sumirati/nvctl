@@ -188,7 +188,6 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 	for (i = 0; i < NVCTL_MAX_GPUS; i++) {
 		ctx->dev_fds[i] = -1;
 		ctx->dev_units[i] = -1;
-		ctx->gpus[i].dev_fd = -1;
 		ctx->gpus[i].dev_unit = -1;
 		ctx->gpus[i].irq = -1;
 	}
@@ -277,6 +276,11 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 	if (verbose)
 		fprintf(stderr, "[v] hClient=0x%08X\n", ctx->h_client);
 
+	/*
+	 * GPU_ATTACH_IDS(0xFFFFFFFF) may return non-OK when another client
+	 * (e.g. nvctl persist) already holds the GPU; GPU_GET_ATTACHED_IDS
+	 * below is the authoritative check.
+	 */
 	memset(&att, 0, sizeof(att));
 	att.gpu_ids[0] = 0xFFFFFFFFU;
 	st = nv_rm_control(ctx, ctx->h_client, NV0000_CTRL_CMD_GPU_ATTACH_IDS,
@@ -300,6 +304,9 @@ nv_ctx_open(struct nvctl_ctx *ctx, int verbose)
 			break;
 
 		g = &ctx->gpus[ctx->gpu_count];
+		memset(g, 0, sizeof(*g));
+		g->dev_unit = -1;
+		g->irq = -1;
 		g->gpu_id = ids.gpu_ids[i];
 		g->device_instance = (uint32_t)ctx->gpu_count;
 		g->subdevice_instance = 0;
@@ -408,6 +415,11 @@ nv_ctx_close(struct nvctl_ctx *ctx)
 	if (ctx->ctl_fd < 0)
 		return;
 
+	/*
+	 * NV_ESC_RM_FREE routes by (hClient, hParent, hObject) inside RM's
+	 * handle table on ctl_fd, including devices allocated via dev_fd on
+	 * 390.xx; freeing h_client last cascades any remaining child handles.
+	 */
 	for (i = 0; i < ctx->gpu_count; i++) {
 		if (ctx->gpus[i].h_sub != 0)
 			(void)rm_free(ctx->ctl_fd, ctx->h_client,
@@ -415,10 +427,6 @@ nv_ctx_close(struct nvctl_ctx *ctx)
 		if (ctx->gpus[i].h_dev != 0)
 			(void)rm_free(ctx->ctl_fd, ctx->h_client,
 			    ctx->h_client, ctx->gpus[i].h_dev);
-		if (ctx->gpus[i].dev_fd >= 0) {
-			close(ctx->gpus[i].dev_fd);
-			ctx->gpus[i].dev_fd = -1;
-		}
 	}
 
 	if (ctx->h_client != 0) {

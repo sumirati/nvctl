@@ -377,7 +377,9 @@ cmd_temp(struct nvctl_ctx *ctx, const struct nvctl_opts *o)
 			if (th.valid)
 				printf("%d\n", th.core_temp_c);
 			else
-				printf("ERR\n");
+				fprintf(stderr,
+				    "nvctl: gpu%d thermal query failed (0x%X)\n",
+				    i, th.rm_status);
 		} else {
 			if (th.valid)
 				printf("gpu%d: %d C (slowdown %u C, shutdown %u C)\n",
