@@ -115,13 +115,17 @@ struct nvctl_hwinfo {
 	int		pstate;
 };
 
+/* rm_ioctl.c */
 int	 nv_ctx_open(struct nvctl_ctx *ctx, int verbose);
 void	 nv_ctx_close(struct nvctl_ctx *ctx);
 uint32_t nv_rm_control(struct nvctl_ctx *ctx, uint32_t h_obj, uint32_t cmd,
 	    void *params, uint32_t params_size);
 
+/* rm_thermal.c */
 int	 nv_thermal_read(struct nvctl_ctx *ctx, int idx,
 	    struct nvctl_thermal *out, int verbose);
+
+/* rm_pmgr.c */
 int	 nv_power_read(struct nvctl_ctx *ctx, int idx,
 	    struct nvctl_power *out, int verbose);
 int	 nv_power_set(struct nvctl_ctx *ctx, int idx, uint32_t watts,
@@ -134,6 +138,7 @@ double	 nv_mem_gbs(uint32_t mem_clk_khz, uint32_t bus_width_bits,
 	    uint32_t ram_type);
 void	 nv_pmgr_probe(struct nvctl_ctx *ctx, int idx, int verbose);
 
+/* compat.c */
 int	 nv_compat_smi(int argc, char *argv[]);
 int	 nv_compat_persistenced(int argc, char *argv[]);
 
