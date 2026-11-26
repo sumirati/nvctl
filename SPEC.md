@@ -107,12 +107,25 @@ nvctl/
 
 ## 5. Roadmap (Post-`v0.1.0`)
 
-### 5.1 FreeBSD Port (`sysutils/nvctl`)
-* Create the port skeleton (`Makefile`, `distinfo`, `pkg-descr`) on a dedicated branch of a `freebsd/freebsd-ports` fork pointing at the `v0.1.0` tag (`LICENSE= BEERWARE`, `LICENSE_FILE= ${WRKSRC}/LICENSE`, pinning one canonical host via `USE_GITHUB=yes` or `USE_GITLAB=yes`).
-* Validate with `portlint -AC` and `poudriere testport` across FreeBSD 14.x and 15.x jails, then submit via FreeBSD Bugzilla (`bugs.freebsd.org`).
-* Optional `v0.2.0`: add a FreeBSD `rc.d/nvctl_persist` service script (boot-time persistence + `rc.conf` power-cap target), fan/live-wattage probes, and **`argv[0]` chameleon modes (opt-in Port symlinks, default off)**:
-  * `nvidia-smi`: translate common flags (`-L`, `-i <N>`, `-pl <W>`, `-pm 1`, `--query-gpu=... --format=csv,noheader,nounits`) and fail loudly (`NVCTL_EXIT_UNSUP`) on unimplemented flags.
-  * `nvidia-persistenced`: thin shim over `nvctl persist` supporting `--verbose`, daemonize/`--no-daemon`, and PID file handling.
+### 5.1 FreeBSD Port (`sysutils/nvctl`) & `nvidia-smi` Feature Tiers
+* Create the port skeleton (`Makefile`, `distinfo`, `pkg-descr`, `files/nvctl_persist.in`) targeting the tagged release (`LICENSE= BEERWARE`, `LICENSE_FILE= ${WRKSRC}/LICENSE`, `USE_GITLAB=yes`, opt-in `NVIDIA_SMI_SYMLINK` / `NVIDIA_PERSISTENCED_SYMLINK`).
+* Validate with `make makesum`, `make stage-qa DEVELOPER=yes`, `make check-plist DEVELOPER=yes`, `portlint -AC`, and `poudriere testport`, then submit via FreeBSD Bugzilla (`bugs.freebsd.org`).
+* Completed in `v0.2.0`–`v0.4.0`: `rc.d/nvctl_persist`, `nvidia-smi` (`--sm`) & `nvidia-persistenced` (`--bd`) personalities, `-d all`, and `390.157` + `470.256.02` dual-branch support.
+
+#### 5.1.1 Tier 1 — High-Value `nvidia-smi` Staples (Target: `v0.5.0`)
+* **Live board power draw (`power.draw`):** Actual watt draw alongside cap (`draw / cap` in `--sm` table and CSV).
+* **GPU & memory utilization (`utilization.gpu`, `utilization.memory`):** Live engine busy percentages via RM perfmon/utilization ioctls.
+* **Fan speed % (`fan.speed`):** Active fan PWM percentage (e.g. `0x20802703` / cooler RM queries; `N/A` on passive datacenter cards).
+* **Loop / watch mode (`-l <sec>` / `--loop=<sec>`):** Continuous terminal polling for `--sm` table and `--query-gpu` CSV.
+
+#### 5.1.2 Tier 2 — Datacenter & HBM2 Extras (Post-P100 Arrival)
+* **Active VRAM processes:** PID, process name, and MiB used (`--query-compute-apps`).
+* **ECC status & error counters:** Volatile/aggregate corrected & uncorrected HBM2 ECC counters (`ecc.errors.*`).
+* **Clock throttle reasons:** Idle vs. thermal slowdown vs. power-cap active reason bitmask.
+* **Topology matrix (`topo -m`):** `PIX` / `PHB` / `SYS` multi-GPU interconnect view for `2× P100` / `PEX8747` rigs.
+
+#### 5.1.3 Tier 3 — Explicit Non-Goals (Fail Loudly with Exit `3`)
+* `-x` (XML output), `-e` (ECC toggle), `-lgc`/`-lmc` (clock locking), MIG, vGPU, `dmon`/`pmon`, and GPU reset (`-r`).
 
 ### 5.2 FreeBSD Version Matrix & Test Strategy
 * **Target Releases:**
@@ -135,8 +148,12 @@ nvctl/
 * **Pascal (`GP100` / `GP104`):** Tesla P100 16GB (`SM 6.0`, `HBM2`, `4096`-bit bus → verifies `HBM2` RAM type + `732 GB/s` bandwidth + 150 W cap) and GTX 1060 / Tesla P4.
 * **Multi-GPU NVIDIA Rig:** 2+ NVIDIA cards simultaneously to verify `-d <N>` enforcement on `power set` and `/dev/nvidia<N>` mapping with `gpu_count > 1`.
 
-### 5.5 Community Announcement Channels
+### 5.5 Native FreeBSD `libnvidia-ml.so.1` (NVML Shim)
+* Build an optional shared library (`libnvidia-ml.so.1`, opt-in Port option `NVML_SHIM`) directly on top of `nvctl`'s verified `rm_ioctl.c` / `rm_thermal.c` / `rm_pmgr.c` core — keeping the entire FreeBSD NVIDIA userland replica in one cohesive codebase rather than duplicating RM ABI logic across repos.
+* Implement the ~25 core NVML symbols `dlopen()`'d by `nvtop`, `btop`, `pynvml`, and monitoring exporters (`nvmlInit_v2`, `nvmlDeviceGetCount_v2`, `nvmlDeviceGetHandleByIndex_v2`, `nvmlDeviceGetName`, `nvmlDeviceGetUUID`, `nvmlDeviceGetPciInfo_v3`, `nvmlDeviceGetTemperature`, `nvmlDeviceGetPowerUsage`, `nvmlDeviceGetEnforcedPowerLimit`, `nvmlDeviceGetMemoryInfo`, `nvmlDeviceGetUtilizationRates`, `nvmlDeviceGetFanSpeed`, `nvmlDeviceGetClockInfo`, `nvmlDeviceGetPerformanceState`, `nvmlDeviceGetCurrPcieLinkGeneration`/`Width`), returning `NVML_ERROR_NOT_SUPPORTED` for unimplemented symbols.
+
+### 5.6 Community Announcement Channels (Optional, Post-Port)
 * **`freebsd-x11@freebsd.org`** — primary FreeBSD graphics/GPU mailing list (read by `nvidia-driver*` and `drm-kmod` maintainers).
 * **`freebsd-ports@freebsd.org`** — once `sysutils/nvctl` is submitted/landed.
 * **`freebsd-hackers@freebsd.org`** — brief `[ANN]` note for systems developers.
-* **FreeBSD Forums** (`forums.freebsd.org` → *Hardware* / *Display Drivers*) and **`r/freebsd`** — primary reach for headless FreeBSD server/homelab users on `nvidia-driver-470`.
+* **FreeBSD Forums** (`forums.freebsd.org` → *Hardware* / *Display Drivers*) and **`r/freebsd`** — primary reach for headless FreeBSD server/homelab users on `nvidia-driver-390`/`470` (high value for free multi-card hardware QA reports).
